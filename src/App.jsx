@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingBag, ChevronRight, CheckCircle, ShieldCheck, Truck, Info, X, MapPin, Smartphone } from 'lucide-react';
+import { ShoppingBag, ChevronRight, CheckCircle, ShieldCheck, Truck, Info, X, MapPin, Smartphone, Box } from 'lucide-react';
 
 // --- WŁASNY KOMPONENT IKONY (Plaster Miodu) ---
 const HoneycombIcon = ({ size = 24, className = "" }) => (
@@ -54,7 +54,12 @@ const PRODUCTS = [
   }
 ];
 
-const SHIPPING_COST = 15.0;
+// --- CENNIK WYSYŁKI ---
+const SHIPPING_COSTS = {
+  pickup: 0.0,
+  paczkomat: 15.0,
+  kurier: 20.0
+};
 
 // --- DANE KONTAKTOWE I WYSYŁKA ---
 // Numer wyświetlany klientowi na ekranie przelewu
@@ -65,18 +70,19 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState('shop'); // shop -> form -> blik -> success
   
-  // Opcje dostawy: 'shipping' lub 'pickup'
-  const [deliveryMethod, setDeliveryMethod] = useState('shipping');
+  // Opcje dostawy: 'paczkomat' | 'kurier' | 'pickup'
+  const [deliveryMethod, setDeliveryMethod] = useState('paczkomat');
 
   // Formularz zamówienia
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
-    address: '',
-    city: '',
-    zip: '',
-    pickupMessage: '',
+    address: '', // używane dla kuriera
+    city: '',    // używane dla kuriera
+    zip: '',     // używane dla kuriera
+    paczkomatCode: '', // używane dla paczkomatu
+    pickupMessage: '', // używane dla odbioru osobistego
     acceptTerms: false
   });
   const [isProcessing, setIsProcessing] = useState(false);
@@ -110,7 +116,7 @@ export default function App() {
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const currentShippingCost = deliveryMethod === 'shipping' ? SHIPPING_COST : 0;
+  const currentShippingCost = SHIPPING_COSTS[deliveryMethod];
 
   // --- OBSŁUGA FORMULARZY ---
   const handleFormChange = (e) => {
@@ -128,6 +134,11 @@ export default function App() {
   const submitOrderToEmail = async () => {
     setIsProcessing(true); 
     
+    let deliveryName = '';
+    if(deliveryMethod === 'paczkomat') deliveryName = 'Paczkomat InPost';
+    if(deliveryMethod === 'kurier') deliveryName = 'Kurier InPost';
+    if(deliveryMethod === 'pickup') deliveryName = 'Odbiór osobisty';
+
     // Budowanie treści maila
     let emailBody = `Nowe zamówienie ze sklepu!\n\n`;
     emailBody += `KOSZYK:\n`;
@@ -135,17 +146,21 @@ export default function App() {
       emailBody += `- ${item.quantity}x ${item.name} (${(item.price * item.quantity).toFixed(2)} zł)\n`;
     });
     
-    emailBody += `\nDOSTAWA: ${deliveryMethod === 'shipping' ? 'Wysyłka (Kurier/Paczkomat)' : 'Odbiór osobisty'}\n`;
+    emailBody += `\nDOSTAWA: ${deliveryName} (${currentShippingCost.toFixed(2)} zł)\n`;
     emailBody += `DO ZAPŁATY: ${(cartTotal + currentShippingCost).toFixed(2)} zł (Opłacone BLIKiem)\n\n`;
     
     emailBody += `DANE KLIENTA:\n`;
     emailBody += `Imię i nazwisko: ${formData.name}\n`;
     emailBody += `Telefon: ${formData.phone}\n`;
     
-    if (deliveryMethod === 'shipping') {
+    if (deliveryMethod === 'paczkomat') {
       emailBody += `E-mail: ${formData.email}\n`;
-      emailBody += `Adres: ${formData.address}\n`;
-      emailBody += `Kod i miasto: ${formData.zip} ${formData.city}\n`;
+      emailBody += `Kod Paczkomatu: ${formData.paczkomatCode}\n`;
+    } else if (deliveryMethod === 'kurier') {
+      emailBody += `E-mail: ${formData.email}\n`;
+      emailBody += `Adres uliczny: ${formData.address}\n`;
+      emailBody += `Kod pocztowy: ${formData.zip}\n`;
+      emailBody += `Miasto: ${formData.city}\n`;
     } else {
       emailBody += `\nWiadomość o odbiorze: ${formData.pickupMessage}\n`;
     }
@@ -204,7 +219,7 @@ export default function App() {
             className="flex items-center gap-3 cursor-pointer group"
             onClick={() => setCheckoutStep('shop')}
           >
-            {/* Nowe logo z plastrami miodu w kolorze pszczoły */}
+            {/* Logo z plastrami miodu w kolorze pszczoły */}
             <div className="flex items-center justify-center text-amber-500 group-hover:text-amber-400 transition-colors">
               <HoneycombIcon size={32} />
             </div>
@@ -236,12 +251,11 @@ export default function App() {
         {/* WIDOK 1: SKLEP */}
         {checkoutStep === 'shop' && (
           <div className="animate-in fade-in duration-500">
-            {/* Hero Section - Zoptymalizowana pod Mobile */}
+            {/* Hero Section */}
             <div className="bg-zinc-900 rounded-3xl p-6 sm:p-12 mb-8 sm:mb-12 text-center text-white relative overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-600 via-amber-400 to-amber-600"></div>
               <h2 className="text-2xl sm:text-5xl font-bold mb-2 sm:mb-4">Prawdziwy miód z naszej pasieki</h2>
               
-              {/* Ukryty na mobile, widoczny od sm */}
               <p className="hidden sm:block max-w-2xl mx-auto text-zinc-400 text-lg sm:text-xl mb-8">
                 Tworzymy miody rzemieślnicze z pasją i szacunkiem do natury. Bez sztucznych dodatków, 
                 bez kompromisów. Prosto z ula na Twój stół.
@@ -249,7 +263,7 @@ export default function App() {
               
               <div className="flex flex-col sm:flex-row flex-wrap justify-center items-center gap-3 sm:gap-6 text-xs sm:text-sm text-zinc-300 mt-4 sm:mt-0">
                 <div className="flex items-center gap-2"><ShieldCheck className="text-amber-500" size={16} /> Gwarancja jakości</div>
-                <div className="flex items-center gap-2"><Truck className="text-amber-500" size={16} /> Szybka wysyłka lub odbiór</div>
+                <div className="flex items-center gap-2"><Truck className="text-amber-500" size={16} /> Paczkomat, Kurier lub Odbiór</div>
                 <div className="flex items-center gap-2"><HoneycombIcon className="text-amber-500" size={16} /> Produkt Polski</div>
               </div>
             </div>
@@ -328,45 +342,68 @@ export default function App() {
               
               <form onSubmit={proceedToBlik} className="space-y-6">
                 
-                {/* WYBÓR METODY DOSTAWY */}
+                {/* WYBÓR METODY DOSTAWY (3 Opcje) */}
                 <div className="mb-8">
                   <label className="block text-sm font-medium text-neutral-700 mb-3">Sposób dostawy</label>
-                  <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    
+                    {/* Paczkomat */}
                     <button
                       type="button"
-                      onClick={() => setDeliveryMethod('shipping')}
-                      className={`p-4 rounded-xl border-2 flex items-center gap-3 transition-all text-left ${
-                        deliveryMethod === 'shipping' 
+                      onClick={() => setDeliveryMethod('paczkomat')}
+                      className={`p-3 sm:p-4 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all text-center ${
+                        deliveryMethod === 'paczkomat' 
                           ? 'border-amber-500 bg-amber-50 text-amber-900' 
                           : 'border-neutral-200 hover:border-neutral-300 text-neutral-600'
                       }`}
                     >
-                      <Truck className={deliveryMethod === 'shipping' ? 'text-amber-500' : 'text-neutral-400'} />
+                      <Box className={deliveryMethod === 'paczkomat' ? 'text-amber-500' : 'text-neutral-400'} size={28} />
                       <div>
-                        <div className="font-bold">Wysyłka kurierska</div>
-                        <div className="text-sm opacity-80">{SHIPPING_COST.toFixed(2)} zł</div>
+                        <div className="font-bold text-sm">Paczkomat</div>
+                        <div className="text-xs opacity-80">{SHIPPING_COSTS.paczkomat.toFixed(2)} zł</div>
                       </div>
                     </button>
+
+                    {/* Kurier */}
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryMethod('kurier')}
+                      className={`p-3 sm:p-4 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all text-center ${
+                        deliveryMethod === 'kurier' 
+                          ? 'border-amber-500 bg-amber-50 text-amber-900' 
+                          : 'border-neutral-200 hover:border-neutral-300 text-neutral-600'
+                      }`}
+                    >
+                      <Truck className={deliveryMethod === 'kurier' ? 'text-amber-500' : 'text-neutral-400'} size={28} />
+                      <div>
+                        <div className="font-bold text-sm">Kurier</div>
+                        <div className="text-xs opacity-80">{SHIPPING_COSTS.kurier.toFixed(2)} zł</div>
+                      </div>
+                    </button>
+
+                    {/* Odbiór osobisty */}
                     <button
                       type="button"
                       onClick={() => setDeliveryMethod('pickup')}
-                      className={`p-4 rounded-xl border-2 flex items-center gap-3 transition-all text-left ${
+                      className={`p-3 sm:p-4 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all text-center ${
                         deliveryMethod === 'pickup' 
                           ? 'border-amber-500 bg-amber-50 text-amber-900' 
                           : 'border-neutral-200 hover:border-neutral-300 text-neutral-600'
                       }`}
                     >
-                      <MapPin className={deliveryMethod === 'pickup' ? 'text-amber-500' : 'text-neutral-400'} />
+                      <MapPin className={deliveryMethod === 'pickup' ? 'text-amber-500' : 'text-neutral-400'} size={28} />
                       <div>
-                        <div className="font-bold">Odbiór osobisty</div>
-                        <div className="text-sm opacity-80">Za darmo (np. Jakubowice Kon.)</div>
+                        <div className="font-bold text-sm leading-tight">Odbiór<br className="hidden sm:block"/> osobisty</div>
+                        <div className="text-xs opacity-80 mt-0.5">Za darmo</div>
                       </div>
                     </button>
+
                   </div>
                 </div>
 
                 {/* POLA FORMULARZA W ZALEŻNOŚCI OD METODY */}
                 <div className="grid sm:grid-cols-2 gap-6">
+                  {/* Dane wspólne dla wszystkich */}
                   <div className="space-y-2 sm:col-span-2">
                     <label className="text-sm font-medium text-neutral-700">Imię i nazwisko</label>
                     <input required type="text" name="name" value={formData.name} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" />
@@ -376,14 +413,32 @@ export default function App() {
                     <input required type="tel" name="phone" value={formData.phone} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" />
                   </div>
 
-                  {deliveryMethod === 'shipping' ? (
+                  {/* Pola dla PACZKOMATU */}
+                  {deliveryMethod === 'paczkomat' && (
                     <>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-neutral-700">Adres E-mail</label>
+                        <label className="text-sm font-medium text-neutral-700">Adres E-mail (do powiadomień)</label>
                         <input required type="email" name="email" value={formData.email} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" />
                       </div>
                       <div className="space-y-2 sm:col-span-2">
-                        <label className="text-sm font-medium text-neutral-700">Ulica i numer domu/mieszkania (lub kod Paczkomatu)</label>
+                        <label className="text-sm font-medium text-neutral-700 flex items-center justify-between">
+                          <span>Kod Paczkomatu (np. WAW123M)</span>
+                          <a href="https://inpost.pl/znajdz-paczkomat" target="_blank" rel="noreferrer" className="text-xs text-amber-600 hover:underline">Znajdź kod</a>
+                        </label>
+                        <input required type="text" name="paczkomatCode" value={formData.paczkomatCode} onChange={handleFormChange} placeholder="Wpisz kod Paczkomatu" className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all uppercase" />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Pola dla KURIERA */}
+                  {deliveryMethod === 'kurier' && (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-neutral-700">Adres E-mail (do powiadomień)</label>
+                        <input required type="email" name="email" value={formData.email} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" />
+                      </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        <label className="text-sm font-medium text-neutral-700">Ulica i numer domu/mieszkania</label>
                         <input required type="text" name="address" value={formData.address} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" />
                       </div>
                       <div className="space-y-2">
@@ -395,8 +450,11 @@ export default function App() {
                         <input required type="text" name="city" value={formData.city} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all" />
                       </div>
                     </>
-                  ) : (
-                    <div className="space-y-2 sm:col-span-2">
+                  )}
+
+                  {/* Pola dla ODBIORU OSOBISTEGO */}
+                  {deliveryMethod === 'pickup' && (
+                    <div className="space-y-2 sm:col-span-2 mt-2">
                       <label className="text-sm font-medium text-neutral-700">Kiedy chciałbyś/chciałabyś odebrać miód?</label>
                       <textarea 
                         required 
@@ -420,7 +478,11 @@ export default function App() {
                         <span>{cartTotal.toFixed(2)} zł</span>
                       </div>
                       <div className="flex justify-between text-neutral-600">
-                        <span>{deliveryMethod === 'shipping' ? 'Wysyłka (Kurier/Paczkomat):' : 'Odbiór osobisty:'}</span>
+                        <span>
+                          {deliveryMethod === 'paczkomat' && 'Paczkomat InPost:'}
+                          {deliveryMethod === 'kurier' && 'Kurier InPost:'}
+                          {deliveryMethod === 'pickup' && 'Odbiór osobisty:'}
+                        </span>
                         <span>{currentShippingCost > 0 ? `${currentShippingCost.toFixed(2)} zł` : 'Za darmo'}</span>
                       </div>
                       <div className="flex justify-between text-xl font-bold text-zinc-900 pt-3 border-t border-neutral-200">
@@ -525,7 +587,7 @@ export default function App() {
             <h2 className="text-3xl font-bold mb-4">Zamówienie przyjęte!</h2>
             <p className="text-neutral-600 mb-8">
               Płatność BLIK weryfikujemy ręcznie. <br/>
-              {deliveryMethod === 'shipping' 
+              {deliveryMethod !== 'pickup' 
                 ? 'Szczegóły wysłaliśmy do pasieki. Niedługo bierzemy się za pakowanie pysznego miodu.' 
                 : 'Szczegóły wysłane! Skontaktujemy się z Tobą, żeby potwierdzić odbiór w pasiece.'}
             </p>
