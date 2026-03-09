@@ -21,42 +21,47 @@ const HoneycombIcon = ({ size = 24, className = "" }) => (
 );
 
 // --- DANE PRODUKTÓW ---
+// Flaga 'isAvailable' steruje tym, czy miód da się kupić. 
+// Szwagier nie ma towaru? Zmieniasz true na false.
 const PRODUCTS = [
   {
     id: 1,
-    name: 'Miód z Maliną', // Nazwa do koszyka i maila
-    labelMain: 'MIÓD', // Design z etykiety
+    name: 'Miód z Maliną', 
+    labelMain: 'MIÓD', 
     labelSub: 'Z MALINĄ',
-    labelColor: 'text-[#c2185b]', // Malinowy róż
+    labelColor: 'text-[#c2185b]', 
     price: 45.0,
     image: '/miod01.jpg',
     description: 'Naturalny miód wielokwiatowy z dodatkiem liofilizowanej maliny. Idealny balans słodyczy i lekkiej kwasowości.',
     weight: '430g',
-    ingredients: 'Miód nektarowy wielokwiatowy 98%, malina liofilizowana 2%'
+    ingredients: 'Miód nektarowy wielokwiatowy 98%, malina liofilizowana 2%',
+    isAvailable: true // <--- DOSTĘPNY
   },
   {
     id: 2,
     name: 'Miód z Imbirem i Cytryną',
     labelMain: 'MIÓD',
     labelSub: 'Z IMBIREM I CYTRYNĄ',
-    labelColor: 'text-[#e0a82e]', // Złoty
+    labelColor: 'text-[#e0a82e]', 
     price: 45.0,
     image: '/miod02.jpg', 
     description: 'Miód z dodatkiem wyrazistego imbiru i orzeźwiającej cytryny. Doskonały wybór na chłodniejsze dni i wsparcie odporności.',
     weight: '430g',
-    ingredients: 'Miód nektarowy wielokwiatowy 95%, cytryna liofilizowana 3%, imbir liofilizowany 2%'
+    ingredients: 'Miód nektarowy wielokwiatowy 95%, cytryna liofilizowana 3%, imbir liofilizowany 2%',
+    isAvailable: false // <--- TESTOWO WYPRZEDANY (zmień na true po testach!)
   },
   {
     id: 3,
     name: 'Miód z Miętą i Czekoladą',
     labelMain: 'MIÓD',
     labelSub: 'Z MIĘTĄ I CZEKOLADĄ',
-    labelColor: 'text-[#5d4037]', // Czekoladowy brąz
+    labelColor: 'text-[#5d4037]', 
     price: 49.0,
     image: '/miod03.jpg', 
     description: 'Wyjątkowa kompozycja naturalnego miodu z orzeźwiającą miętą i prawdziwą czekoladą. Świetny dodatek do deserów.',
     weight: '430g',
-    ingredients: 'Miód nektarowy wielokwiatowy 90%, prawdziwa czekolada 8%, mięta suszona 2%'
+    ingredients: 'Miód nektarowy wielokwiatowy 90%, prawdziwa czekolada 8%, mięta suszona 2%',
+    isAvailable: true // <--- DOSTĘPNY
   }
 ];
 
@@ -67,30 +72,24 @@ const SHIPPING_COSTS = {
 };
 
 // --- DANE KONTAKTOWE ---
-// WAŻNE: Środowisko podglądu może zgłaszać błędy przy obiekcie import.meta.
-// Wklejając ten kod u siebie do projektu na Vercel/Vite, ODKOMENTUJ poniższy blok 
-// i ZAKOMENTUJ "DANE TYMCZASOWE".
+const DISPLAY_PHONE = import.meta.env?.VITE_SELLER_PHONE || '123 456 789';
+const DISPLAY_EMAIL = import.meta.env?.VITE_SELLER_EMAIL || 'kontakt@pasieka.pl';
+const SELLER_NAME = import.meta.env?.VITE_SELLER_NAME || '[Imię i Nazwisko Szwagra]';
+const SELLER_ADDRESS = import.meta.env?.VITE_SELLER_ADDRESS || '[Adres pasieki]';
+const SELLER_WNI = import.meta.env?.VITE_SELLER_WNI || '[Numer WNI]';
 
-/* === WERSJA PRODUKCYJNA (VERCEL) ===
-const DISPLAY_PHONE = import.meta.env.VITE_SELLER_PHONE || '123 456 789';
-const DISPLAY_EMAIL = import.meta.env.VITE_SELLER_EMAIL || 'kontakt@pasieka.pl';
-const SELLER_NAME = import.meta.env.VITE_SELLER_NAME || '[Imię i Nazwisko Szwagra]';
-const SELLER_ADDRESS = import.meta.env.VITE_SELLER_ADDRESS || '[Adres pasieki, np. Jakubowice Konińskie 123]';
-const SELLER_WNI = import.meta.env.VITE_SELLER_WNI || '[Numer WNI]';
-const WEB3FORMS_KEY = import.meta.env.VITE_WEB3FORMS_KEY || '';
-*/
-
-// === DANE TYMCZASOWE (DO PODGLĄDU) ===
-const DISPLAY_PHONE = '123 456 789';
-const DISPLAY_EMAIL = 'kontakt@pasieka.pl';
-const SELLER_NAME = '[Imię i Nazwisko Szwagra]';
-const SELLER_ADDRESS = '[Adres pasieki, np. Jakubowice Konińskie 123]';
-const SELLER_WNI = '[Numer WNI]';
-const WEB3FORMS_KEY = '';
+const getWeb3FormsKey = () => {
+    try {
+        if (typeof import.meta !== 'undefined' && import.meta.env) {
+            return import.meta.env.VITE_WEB3FORMS_KEY;
+        }
+    } catch (e) {}
+    return ''; 
+};
 
 export default function App() {
   // Nawigacja Główna
-  const [activePage, setActivePage] = useState('shop'); // 'shop' | 'about' | 'gallery'
+  const [activePage, setActivePage] = useState('shop'); 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Koszyk i Zamówienie
@@ -108,6 +107,9 @@ export default function App() {
 
   // --- LOGIKA KOSZYKA ---
   const addToCart = (product) => {
+    // Podwójne zabezpieczenie, żeby haker nie dodał produktu, którego nie ma
+    if (!product.isAvailable) return; 
+
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
@@ -173,11 +175,22 @@ export default function App() {
     }
 
     try {
+      const apiKey = getWeb3FormsKey();
+      
+      if (!apiKey) {
+        setTimeout(() => {
+           setCheckoutStep('success');
+           setCart([]);
+           setIsProcessing(false);
+        }, 1500);
+        return;
+      }
+
       const response = await fetch("https://api.web3forms.com/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          access_key: WEB3FORMS_KEY,
+          access_key: apiKey,
           subject: `Nowe zamówienie od: ${formData.name} - ${(cartTotal + currentShippingCost).toFixed(2)} zł`,
           from_name: "Sklep Pasieka",
           message: emailBody,
@@ -226,7 +239,6 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* Przycisk Menu (Hamburger) */}
             <button 
               onClick={() => setIsSidebarOpen(true)}
               className="p-2 -ml-2 hover:bg-[#1a1a1a] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-[#e0a82e]"
@@ -234,7 +246,6 @@ export default function App() {
               <Menu size={26} className="text-[#e0a82e]" />
             </button>
 
-            {/* Logo z Pszczołą i Nazwa */}
             <div 
               className="flex items-center gap-2 sm:gap-3 cursor-pointer group"
               onClick={() => handleNavClick('shop')}
@@ -249,7 +260,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Koszyk */}
           {activePage === 'shop' && checkoutStep === 'shop' && (
             <button 
               onClick={() => setIsCartOpen(true)}
@@ -333,7 +343,6 @@ export default function App() {
              </p>
              
              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-               {/* 6 kafelków na zdjęcia. Mechanizm onError chowa zepsuty obrazek i pokazuje opis */}
                {[1, 2, 3, 4, 5, 6].map(num => (
                  <div key={num} className="aspect-square bg-zinc-100 rounded-2xl overflow-hidden relative shadow-sm border border-neutral-100 group">
                     <img 
@@ -389,26 +398,36 @@ export default function App() {
 
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                   {PRODUCTS.map(product => (
-                    <div key={product.id} className="bg-white rounded-2xl shadow-md border border-neutral-100 overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col group">
-                      <div className="aspect-square bg-neutral-100 relative overflow-hidden">
+                    <div key={product.id} className="bg-white rounded-2xl shadow-md border border-neutral-100 overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col group relative">
+                      
+                      {/* ZDJĘCIE Z FILTREM, JEŚLI WYPRZEDANE */}
+                      <div className={`aspect-square bg-neutral-100 relative overflow-hidden ${!product.isAvailable ? 'opacity-60 grayscale-[40%]' : ''}`}>
+                        
+                        {/* PLAKIETKA WYPRZEDANE */}
+                        {!product.isAvailable && (
+                          <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-sm text-[#e0a82e] text-xs font-bold px-4 py-2 rounded-full z-10 uppercase tracking-widest border border-[#e0a82e]/40 shadow-xl whitespace-nowrap">
+                            Wyprzedane
+                          </div>
+                        )}
+
                         <ImageWithFallback 
                           src={product.image} 
                           alt={product.name} 
-                          className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                          className={`w-full h-full object-cover object-center transition-transform duration-500 ${product.isAvailable ? 'group-hover:scale-105' : ''}`}
                         />
                       </div>
+
                       <div className="p-6 flex flex-col flex-grow">
-                        
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex flex-col">
                             <h3 className="text-3xl sm:text-4xl font-serif text-zinc-900 tracking-widest uppercase leading-none mb-1">
                               {product.labelMain}
                             </h3>
-                            <span className={`text-xs sm:text-sm font-medium tracking-widest uppercase ${product.labelColor}`}>
+                            <span className={`text-xs sm:text-sm font-medium tracking-widest uppercase ${product.isAvailable ? product.labelColor : 'text-neutral-400'}`}>
                               {product.labelSub}
                             </span>
                           </div>
-                          <span className="text-xl font-bold text-[#c28e1f] whitespace-nowrap ml-4 bg-[#e0a82e]/10 px-3 py-1 rounded-lg h-fit">
+                          <span className={`text-xl font-bold whitespace-nowrap ml-4 px-3 py-1 rounded-lg h-fit ${product.isAvailable ? 'text-[#c28e1f] bg-[#e0a82e]/10' : 'text-neutral-500 bg-neutral-100'}`}>
                             {product.price.toFixed(2)} zł
                           </span>
                         </div>
@@ -429,11 +448,21 @@ export default function App() {
                           )}
                         </div>
                         
+                        {/* ZMIENNY PRZYCISK ZALEŻNIE OD DOSTĘPNOŚCI */}
                         <button 
+                          disabled={!product.isAvailable}
                           onClick={() => addToCart(product)}
-                          className="w-full py-3.5 bg-black text-white rounded-xl font-bold tracking-wide hover:bg-[#e0a82e] hover:text-black transition-colors duration-200 flex justify-center items-center gap-2"
+                          className={`w-full py-3.5 rounded-xl font-bold tracking-wide flex justify-center items-center gap-2 transition-colors duration-200 ${
+                            product.isAvailable 
+                              ? 'bg-black text-white hover:bg-[#e0a82e] hover:text-black shadow-lg shadow-black/10' 
+                              : 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
+                          }`}
                         >
-                          <ShoppingBag size={18} /> Do koszyka
+                          {product.isAvailable ? (
+                            <><ShoppingBag size={18} /> Do koszyka</>
+                          ) : (
+                            'Chwilowy brak'
+                          )}
                         </button>
                       </div>
                     </div>
