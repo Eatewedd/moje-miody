@@ -66,7 +66,27 @@ const SHIPPING_COSTS = {
   kurier: 20.0
 };
 
+// --- DANE KONTAKTOWE ---
+// WAŻNE: Środowisko podglądu może zgłaszać błędy przy obiekcie import.meta.
+// Wklejając ten kod u siebie do projektu na Vercel/Vite, ODKOMENTUJ poniższy blok 
+// i ZAKOMENTUJ "DANE TYMCZASOWE".
+
+/* === WERSJA PRODUKCYJNA (VERCEL) ===
+const DISPLAY_PHONE = import.meta.env.VITE_SELLER_PHONE || '123 456 789';
+const DISPLAY_EMAIL = import.meta.env.VITE_SELLER_EMAIL || 'kontakt@pasieka.pl';
+const SELLER_NAME = import.meta.env.VITE_SELLER_NAME || '[Imię i Nazwisko Szwagra]';
+const SELLER_ADDRESS = import.meta.env.VITE_SELLER_ADDRESS || '[Adres pasieki, np. Jakubowice Konińskie 123]';
+const SELLER_WNI = import.meta.env.VITE_SELLER_WNI || '[Numer WNI]';
+const WEB3FORMS_KEY = import.meta.env.VITE_WEB3FORMS_KEY || '';
+*/
+
+// === DANE TYMCZASOWE (DO PODGLĄDU) ===
 const DISPLAY_PHONE = '123 456 789';
+const DISPLAY_EMAIL = 'kontakt@pasieka.pl';
+const SELLER_NAME = '[Imię i Nazwisko Szwagra]';
+const SELLER_ADDRESS = '[Adres pasieki, np. Jakubowice Konińskie 123]';
+const SELLER_WNI = '[Numer WNI]';
+const WEB3FORMS_KEY = '';
 
 export default function App() {
   // Nawigacja Główna
@@ -157,7 +177,7 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          access_key: import.meta.env.VITE_WEB3FORMS_KEY,
+          access_key: WEB3FORMS_KEY,
           subject: `Nowe zamówienie od: ${formData.name} - ${(cartTotal + currentShippingCost).toFixed(2)} zł`,
           from_name: "Sklep Pasieka",
           message: emailBody,
@@ -598,6 +618,7 @@ export default function App() {
             <h4 className="text-white font-bold mb-4">Kontakt</h4>
             <ul className="text-sm space-y-2">
               <li>{DISPLAY_PHONE}</li>
+              <li>{DISPLAY_EMAIL}</li>
             </ul>
           </div>
           <div>
@@ -608,8 +629,8 @@ export default function App() {
         </div>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-[#1a1a1a] text-xs text-neutral-500 text-center space-y-2">
           <p>Sprzedaż prowadzona w ramach Rolniczego Handlu Detalicznego (RHD).</p>
-          <p>Pasieka Nasze Pszczoły - [Imię i Nazwisko Szwagra] | [Adres pasieki, np. Jakubowice Konińskie 123]</p>
-          <p>Weterynaryjny Numer Identyfikacyjny (WNI): [Numer WNI]</p>
+          <p>Pasieka Nasze Pszczoły - {SELLER_NAME} | {SELLER_ADDRESS}</p>
+          <p>Weterynaryjny Numer Identyfikacyjny (WNI): {SELLER_WNI}</p>
         </div>
       </footer>
 
@@ -723,8 +744,8 @@ export default function App() {
                 <h4 className="font-bold text-black mb-2 font-serif text-lg">CZĘŚĆ I: REGULAMIN SKLEPU</h4>
                 <p className="mb-2"><strong>§ 1. Postanowienia ogólne</strong></p>
                 <ol className="list-decimal pl-4 space-y-1 mb-4">
-                  <li>Sprzedawcą miodu oraz Administratorem Danych Osobowych na stronie jest osoba fizyczna: [Imię i Nazwisko Szwagra], prowadząca działalność rolniczą w postaci pasieki "Nasze Pszczoły", zlokalizowanej pod adresem: [Adres pasieki, np. Jakubowice Konińskie 123].</li>
-                  <li>Pasieka działa w ramach Rolniczego Handlu Detalicznego (RHD) i znajduje się pod nadzorem Powiatowego Lekarza Weterynarii. Weterynaryjny Numer Identyfikacyjny (WNI): [Numer WNI].</li>
+                  <li>Sprzedawcą miodu oraz Administratorem Danych Osobowych na stronie jest osoba fizyczna: {SELLER_NAME}, prowadząca działalność rolniczą w postaci pasieki "Nasze Pszczoły", zlokalizowanej pod adresem: {SELLER_ADDRESS}.</li>
+                  <li>Pasieka działa w ramach Rolniczego Handlu Detalicznego (RHD) i znajduje się pod nadzorem Powiatowego Lekarza Weterynarii. Weterynaryjny Numer Identyfikacyjny (WNI): {SELLER_WNI}.</li>
                 </ol>
                 <p className="mb-2"><strong>§ 4. Prawo odstąpienia od umowy i Reklamacje</strong></p>
                 <ol className="list-decimal pl-4 space-y-1">
@@ -734,7 +755,7 @@ export default function App() {
               </div>
               <div className="pt-4 border-t border-neutral-100">
                 <h4 className="font-bold text-black mb-2 font-serif text-lg">CZĘŚĆ II: POLITYKA PRYWATNOŚCI (RODO)</h4>
-                <p className="mb-2"><strong>§ 1. Kto przetwarza Twoje dane?</strong><br/>Administratorem Twoich danych osobowych przekazanych w formularzu zamówienia jest [Imię i Nazwisko Szwagra], [Adres].</p>
+                <p className="mb-2"><strong>§ 1. Kto przetwarza Twoje dane?</strong><br/>Administratorem Twoich danych osobowych przekazanych w formularzu zamówienia jest {SELLER_NAME}, {SELLER_ADDRESS}.</p>
                 <p className="mb-2"><strong>§ 2. Po co zbieramy Twoje dane?</strong><br/>Zbieramy Twoje dane wyłącznie w jednym celu: aby zrealizować Twoje zamówienie i wydać/wysłać Ci miód. Podstawą prawną jest niezbędność do wykonania umowy.</p>
                 <p><strong>§ 3. Komu przekazujemy Twoje dane?</strong><br/>Nie sprzedajemy Twoich danych. Przekazujemy je wyłącznie podmiotom kurierskim w celu dostawy (jeśli dotyczy) oraz bezpiecznym kanałem e-mail do realizacji zamówienia.</p>
               </div>
