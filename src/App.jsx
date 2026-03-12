@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ShoppingBag, ChevronRight, ChevronLeft, CheckCircle, ShieldCheck, Truck, Info, X, MapPin, Smartphone, Box, Menu, Camera, AlertCircle, Copy } from 'lucide-react';
+import { ShoppingBag, ChevronRight, ChevronLeft, CheckCircle, ShieldCheck, Truck, Info, X, MapPin, Smartphone, Box, Menu, Camera, AlertCircle, Copy, FileText } from 'lucide-react';
 
 // --- WŁASNY KOMPONENT IKONY (Plaster Miodu) ---
 const HoneycombIcon = ({ size = 24, className = "" }) => (
@@ -69,12 +69,28 @@ const SHIPPING_COSTS = {
   kurier: 20.0
 };
 
-const DISPLAY_PHONE = import.meta.env.VITE_SELLER_PHONE || '123 456 789';
-const DISPLAY_EMAIL = import.meta.env.VITE_SELLER_EMAIL || 'kontakt@pasieka.pl';
-const SELLER_NAME = import.meta.env.VITE_SELLER_NAME || '[Imię i Nazwisko]';
-const SELLER_ADDRESS = import.meta.env.VITE_SELLER_ADDRESS || '[Adres pasieki]';
-const SELLER_WNI = import.meta.env.VITE_SELLER_WNI || '[Numer WNI]';
-const WEB3FORMS_KEY = import.meta.env.VITE_WEB3FORMS_KEY || '';
+// BEZPIECZNE POBIERANIE ZMIENNYCH ŚRODOWISKOWYCH
+const getEnvVar = (key, fallback) => {
+  try {
+    // eslint-disable-next-line no-undef
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
+      // eslint-disable-next-line no-undef
+      return import.meta.env[key];
+    }
+  } catch (e) {
+    // Ignore errors in environments where import.meta is not available
+  }
+  return fallback;
+};
+
+const DISPLAY_PHONE = getEnvVar('VITE_SELLER_PHONE', '123 456 789');
+const DISPLAY_EMAIL = getEnvVar('VITE_SELLER_EMAIL', 'kontakt@pasieka.pl');
+const SELLER_NAME = getEnvVar('VITE_SELLER_NAME', '[Imię i Nazwisko]');
+const SELLER_ADDRESS = getEnvVar('VITE_SELLER_ADDRESS', '[Adres pasieki]');
+const SELLER_CITY = getEnvVar('VITE_SELLER_CITY', '[Miejscowość]');
+const SELLER_WNI = getEnvVar('VITE_SELLER_WNI', '[Numer WNI]');
+const SITE_URL = getEnvVar('VITE_SITE_URL', 'naszepszczoly.pl');
+const WEB3FORMS_KEY = getEnvVar('VITE_WEB3FORMS_KEY', '');
 
 export default function App() {
   // Nawigacja Główna
@@ -628,7 +644,6 @@ export default function App() {
                         <div className="text-xs text-neutral-400 mb-5 border-b border-neutral-100 pb-5 flex items-center gap-1.5 relative">
                           <span>Waga netto: {product.weight}</span>
                           {product.ingredients && (
-                            // UX: Tooltip wyzwalany JEDYNIE na ikonce
                             <div 
                               className="relative flex items-center cursor-pointer group/tooltip"
                               onClick={(e) => {
@@ -974,6 +989,13 @@ export default function App() {
               >
                 <Smartphone size={20} /> Kontakt
               </button>
+              {/* NOWA ZAKŁADKA - REGULAMIN I RODO */}
+              <button 
+                onClick={() => { setIsSidebarOpen(false); setIsLegalModalOpen(true); }}
+                className="p-4 text-left rounded-xl text-lg font-medium text-zinc-300 hover:bg-[#1a1a1a] hover:text-white transition-colors flex items-center gap-3"
+              >
+                <FileText size={20} /> Regulamin i RODO
+              </button>
             </nav>
 
             <div className="p-6 text-xs text-zinc-500 border-t border-[#1a1a1a]">
@@ -990,32 +1012,74 @@ export default function App() {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setIsLegalModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-6 border-b border-neutral-100 shrink-0">
-              <h3 className="text-xl font-bold text-black font-serif">Regulamin i Polityka Prywatności</h3>
+              <h3 className="text-xl font-bold text-zinc-900 font-serif">Regulamin i Polityka Prywatności</h3>
               <button onClick={() => setIsLegalModalOpen(false)} className="p-2 hover:bg-neutral-100 rounded-full transition-colors"><X size={20} /></button>
             </div>
             <div className="p-6 overflow-y-auto text-sm text-neutral-600 space-y-6">
+              
               <div>
-                <h4 className="font-bold text-black mb-2 font-serif text-lg">CZĘŚĆ I: REGULAMIN SKLEPU</h4>
-                <p className="mb-2"><strong>§ 1. Postanowienia ogólne</strong></p>
+                <h4 className="font-bold text-zinc-900 mb-2 font-serif text-lg">CZĘŚĆ I: REGULAMIN SKLEPU</h4>
+                
+                <p className="font-bold mt-4 mb-2 text-zinc-800">§ 1. Postanowienia ogólne</p>
                 <ol className="list-decimal pl-4 space-y-1 mb-4">
-                  <li>Sprzedawcą miodu oraz Administratorem Danych Osobowych na stronie jest osoba fizyczna: {SELLER_NAME}, prowadząca działalność rolniczą w postaci pasieki "Nasze Pszczoły", zlokalizowanej pod adresem: {SELLER_ADDRESS}.</li>
-                  <li>Pasieka działa w ramach Rolniczego Handlu Detalicznego (RHD) i znajduje się pod nadzorem Powiatowego Lekarza Weterynarii. Weterynaryjny Numer Identyfikacyjny (WNI): {SELLER_WNI}.</li>
+                  <li>Sprzedawcą miodu oraz Administratorem Danych Osobowych na stronie {SITE_URL} jest osoba fizyczna: {SELLER_NAME}, prowadząca działalność rolniczą w postaci pasieki "Nasze Pszczoły", zlokalizowanej pod adresem: {SELLER_ADDRESS}.</li>
+                  <li>Pasieka działa w ramach Rolniczego Handlu Detalicznego (RHD) i znajduje się pod nadzorem Powiatowego Lekarza Weterynarii w {SELLER_CITY}. Weterynaryjny Numer Identyfikacyjny (WNI): {SELLER_WNI}.</li>
+                  <li>Kontakt ze Sprzedawcą możliwy jest pod adresem e-mail: {DISPLAY_EMAIL} lub numerem telefonu: {DISPLAY_PHONE}.</li>
                 </ol>
-                <p className="mb-2"><strong>§ 4. Prawo odstąpienia od umowy i Reklamacje</strong></p>
-                <ol className="list-decimal pl-4 space-y-1">
-                  <li>Kupujący ma prawo odstąpić od umowy zawartej na odległość w terminie 14 dni bez podawania przyczyny.</li>
-                  <li><strong>UWAGA:</strong> Prawo do odstąpienia nie przysługuje w przypadku produktów dostarczanych w zapieczętowanym opakowaniu (np. słoik miodu), których po otwarciu nie można zwrócić ze względu na ochronę zdrowia lub względy higieniczne.</li>
+
+                <p className="font-bold mt-4 mb-2 text-zinc-800">§ 2. Zamówienia i Płatności</p>
+                <ol className="list-decimal pl-4 space-y-1 mb-4">
+                  <li>Strona umożliwia zakup produktów pszczelich pochodzących wyłącznie z własnej pasieki Sprzedawcy.</li>
+                  <li>Ceny podane na stronie są cenami końcowymi (brutto) i zawierają wszystkie koszty z wyjątkiem kosztów dostawy.</li>
+                  <li>Płatność za zamówienie realizowana jest z góry, wyłącznie za pomocą systemu BLIK (przelew na telefon lub kod BLIK) na podane przez Sprzedawcę dane.</li>
+                  <li>Zamówienie zostaje przyjęte do realizacji po zaksięgowaniu wpłaty.</li>
+                </ol>
+
+                <p className="font-bold mt-4 mb-2 text-zinc-800">§ 3. Dostawa</p>
+                <ol className="list-decimal pl-4 space-y-1 mb-4">
+                  <li>Wysyłka produktów realizowana jest za pośrednictwem firm kurierskich lub paczkomatów na adres wskazany przez Kupującego.</li>
+                  <li>Koszt dostawy doliczany jest do sumy zamówienia i podany jest przed jego finalizacją.</li>
+                  <li>Czas przygotowania paczki do wysyłki wynosi zazwyczaj od 2 do 5 dni roboczych.</li>
+                </ol>
+
+                <p className="font-bold mt-4 mb-2 text-zinc-800">§ 4. Prawo odstąpienia od umowy i Reklamacje</p>
+                <ol className="list-decimal pl-4 space-y-1 mb-4">
+                  <li>Zgodnie z Ustawą o prawach konsumenta, Kupujący ma prawo odstąpić od umowy zawartej na odległość w terminie 14 dni bez podawania przyczyny.</li>
+                  <li><strong>UWAGA:</strong> Prawo do odstąpienia od umowy nie przysługuje w przypadku produktów, które ulegają szybkiemu zepsuciu lub w przypadku towarów dostarczanych w zapieczętowanym opakowaniu, których po otwarciu nie można zwrócić ze względu na ochronę zdrowia lub względów higienicznych (np. otwarty słoik miodu).</li>
+                  <li>Aby zwrócić fabrycznie zamknięty produkt lub złożyć reklamację (np. stłuczony słoik w transporcie), Kupujący powinien skontaktować się ze Sprzedawcą mailowo: {DISPLAY_EMAIL}.</li>
                 </ol>
               </div>
+
               <div className="pt-4 border-t border-neutral-100">
-                <h4 className="font-bold text-black mb-2 font-serif text-lg">CZĘŚĆ II: POLITYKA PRYWATNOŚCI (RODO)</h4>
-                <p className="mb-2"><strong>§ 1. Kto przetwarza Twoje dane?</strong><br/>Administratorem Twoich danych osobowych przekazanych w formularzu zamówienia jest {SELLER_NAME}, {SELLER_ADDRESS}.</p>
-                <p className="mb-2"><strong>§ 2. Po co zbieramy Twoje dane?</strong><br/>Zbieramy Twoje dane wyłącznie w jednym celu: aby zrealizować Twoje zamówienie i wydać/wysłać Ci miód. Podstawą prawną jest niezbędność do wykonania umowy.</p>
-                <p><strong>§ 3. Komu przekazujemy Twoje dane?</strong><br/>Nie sprzedajemy Twoich danych. Przekazujemy je wyłącznie podmiotom kurierskim w celu dostawy (jeśli dotyczy) oraz bezpiecznym kanałem e-mail do realizacji zamówienia.</p>
+                <h4 className="font-bold text-zinc-900 mb-2 font-serif text-lg">CZĘŚĆ II: POLITYKA PRYWATNOŚCI (RODO)</h4>
+                
+                <p className="mb-2"><strong className="text-zinc-800">§ 1. Kto przetwarza Twoje dane?</strong><br/>Administratorem Twoich danych osobowych przekazanych w formularzu zamówienia jest {SELLER_NAME}, {SELLER_ADDRESS}.</p>
+                
+                <p className="mb-2"><strong className="text-zinc-800">§ 2. Po co zbieramy Twoje dane i na jakiej podstawie?</strong><br/>Zbieramy Twoje dane (imię, nazwisko, adres wysyłki, numer telefonu, adres e-mail) wyłącznie w jednym celu: aby zrealizować Twoje zamówienie i wysłać Ci miód. Podstawą prawną przetwarzania jest art. 6 ust. 1 lit. b RODO (niezbędność do wykonania umowy, której stroną jest osoba, której dane dotyczą).</p>
+                
+                <p className="mb-2"><strong className="text-zinc-800">§ 3. Komu przekazujemy Twoje dane?</strong><br/>Nie sprzedajemy Twoich danych i nie używamy ich do wysyłania reklam. Twoje dane przekazujemy wyłącznie podmiotom, które pomagają nam dostarczyć Ci zamówienie, tj.:</p>
+                <ul className="list-disc pl-5 space-y-1 mb-4 marker:text-amber-500">
+                  <li>Firmom kurierskim (np. InPost, DPD) w celu wygenerowania etykiety nadawczej.</li>
+                  <li>Operatorom płatności (w celu przetworzenia płatności BLIK).</li>
+                </ul>
+
+                <p className="mb-2"><strong className="text-zinc-800">§ 4. Jak długo przechowujemy dane?</strong><br/>Twoje dane przechowujemy tylko tak długo, jak to konieczne do zrealizowania zamówienia, rozpatrzenia ewentualnych reklamacji oraz spełnienia obowiązków podatkowych i księgowych nałożonych przez polskie prawo.</p>
+                
+                <p className="mb-2"><strong className="text-zinc-800">§ 5. Twoje prawa</strong><br/>Masz prawo do:</p>
+                <ul className="list-disc pl-5 space-y-1 mb-4 marker:text-amber-500">
+                  <li>dostępu do swoich danych,</li>
+                  <li>sprostowania swoich danych,</li>
+                  <li>usunięcia danych ("prawo do bycia zapomnianym") - chyba że prawo nakazuje nam je trzymać np. do celów podatkowych,</li>
+                  <li>ograniczenia przetwarzania,</li>
+                  <li>wniesienia skargi do Prezesa Urzędu Ochrony Danych Osobowych (PUODO).</li>
+                </ul>
+
+                <p className="mb-2"><strong className="text-zinc-800">§ 6. Ciasteczka (Cookies)</strong><br/>Nasza strona jest prosta i przyjazna użytkownikom. Nie używamy zaawansowanych mechanizmów śledzących, takich jak Google Analytics czy Facebook Pixel. Wykorzystujemy jedynie pamięć podręczną Twojej przeglądarki do prawidłowego działania koszyka zakupowego (są to dane niezbędne do technicznego działania strony).</p>
               </div>
+
             </div>
             <div className="p-6 border-t border-neutral-100 bg-neutral-50 shrink-0 rounded-b-2xl flex justify-end">
-              <button onClick={() => setIsLegalModalOpen(false)} className="px-8 py-3 bg-black text-white rounded-xl font-bold hover:bg-[#e0a82e] hover:text-black transition-colors">Zamknij</button>
+              <button onClick={() => setIsLegalModalOpen(false)} className="px-8 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-amber-500 hover:text-zinc-900 transition-colors">Zamknij</button>
             </div>
           </div>
         </div>
