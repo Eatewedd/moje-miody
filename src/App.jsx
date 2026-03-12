@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ShoppingBag, ChevronRight, CheckCircle, ShieldCheck, Truck, Info, X, MapPin, Smartphone, Box, Menu, Camera } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ShoppingBag, ChevronRight, ChevronLeft, CheckCircle, ShieldCheck, Truck, Info, X, MapPin, Smartphone, Box, Menu, Camera } from 'lucide-react';
 
 // --- WŁASNY KOMPONENT IKONY (Plaster Miodu) ---
 const HoneycombIcon = ({ size = 24, className = "" }) => (
@@ -97,7 +97,11 @@ export default function App() {
   const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
 
   // Stan do powiększania zdjęć w galerii
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(null);
+  
+  // Stany dla obsługi swipe'a (przesunięcia palcem)
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
 
   // --- LOGIKA KOSZYKA ---
   const addToCart = (product) => {
@@ -202,6 +206,56 @@ export default function App() {
       alert("Błąd połączenia. Spróbuj ponownie.");
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  // --- LOGIKA GALERII I SWIPOWANIA ---
+  const handlePrevImage = useCallback(() => {
+    setSelectedGalleryIndex(prev => prev === 1 ? 12 : prev - 1);
+  }, []);
+
+  const handleNextImage = useCallback(() => {
+    setSelectedGalleryIndex(prev => prev === 12 ? 1 : prev + 1);
+  }, []);
+
+  // Obsługa klawiatury
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (selectedGalleryIndex === null) return;
+      if (e.key === 'ArrowLeft') handlePrevImage();
+      if (e.key === 'ArrowRight') handleNextImage();
+      if (e.key === 'Escape') setSelectedGalleryIndex(null);
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedGalleryIndex, handlePrevImage, handleNextImage]);
+
+  // Minimalny dystans przesunięcia (w pikselach), żeby uznać to za swipe
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    // Przesunięcie palcem w lewo -> następne zdjęcie
+    if (isLeftSwipe) {
+      handleNextImage();
+    }
+    // Przesunięcie palcem w prawo -> poprzednie zdjęcie
+    if (isRightSwipe) {
+      handlePrevImage();
     }
   };
 
@@ -354,7 +408,7 @@ export default function App() {
                         src={imagePath} 
                         alt={`Z życia pasieki ${num}`} 
                         className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-500" 
-                        onClick={() => setSelectedImage(imagePath)}
+                        onClick={() => setSelectedGalleryIndex(num)}
                         onError={(e) => { 
                           e.target.style.display = 'none'; 
                           e.target.nextSibling.style.display = 'flex'; 
@@ -445,7 +499,7 @@ export default function App() {
                           <span>Waga netto: {product.weight}</span>
                           {product.ingredients && (
                             <div className="relative flex items-center group/tooltip cursor-help">
-                              <Info size={15} className="text-neutral-300 hover:text-[#e0a82e] transition-colors" />
+                              <Info size={15} className="text-[#e0a82e] hover:text-[#c28e1f] transition-colors" />
                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-3 bg-black text-white text-[11px] leading-relaxed rounded-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 z-10 text-center shadow-xl">
                                 <span className="font-bold text-[#e0a82e] block mb-1 uppercase tracking-wider text-[9px]">Skład:</span>
                                 {product.ingredients}
@@ -803,27 +857,57 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL GALERII (LIGHTBOX) */}
-      {selectedImage && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {/* MODAL GALERII (LIGHTBOX) Z NAWIGACJĄ I SWIPEM */}
+      {selectedGalleryIndex !== null && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 touch-none"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           <div 
             className="absolute inset-0 bg-black/95 backdrop-blur-md transition-opacity cursor-zoom-out" 
-            onClick={() => setSelectedImage(null)}
+            onClick={() => setSelectedGalleryIndex(null)}
           ></div>
           
           <button 
-            onClick={() => setSelectedImage(null)} 
+            onClick={() => setSelectedGalleryIndex(null)} 
             className="absolute top-4 right-4 sm:top-8 sm:right-8 p-2 text-zinc-400 hover:text-white bg-black/50 hover:bg-black rounded-full transition-all z-10"
           >
             <X size={32} />
           </button>
+
+          {/* Przycisk Wstecz (Widoczny tylko na większych ekranach) */}
+          <button 
+            onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
+            className="absolute left-4 sm:left-8 p-2 text-zinc-400 hover:text-[#e0a82e] bg-black/50 hover:bg-black rounded-full transition-all z-10 hidden sm:block"
+          >
+            <ChevronLeft size={48} strokeWidth={1.5} />
+          </button>
+
+          {/* Przycisk Dalej (Widoczny tylko na większych ekranach) */}
+          <button 
+            onClick={(e) => { e.stopPropagation(); handleNextImage(); }}
+            className="absolute right-4 sm:right-8 p-2 text-zinc-400 hover:text-[#e0a82e] bg-black/50 hover:bg-black rounded-full transition-all z-10 hidden sm:block"
+          >
+            <ChevronRight size={48} strokeWidth={1.5} />
+          </button>
           
-          <div className="relative w-full h-full max-h-[90vh] flex items-center justify-center animate-in zoom-in-95 duration-300 pointer-events-none">
+          <div className="relative w-full h-full max-h-[90vh] flex items-center justify-center animate-in zoom-in-95 duration-300 pointer-events-none select-none">
             <img 
-              src={selectedImage} 
-              alt="Powiększenie z galerii" 
-              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl pointer-events-auto"
+              src={`/galeria${selectedGalleryIndex < 10 ? `0${selectedGalleryIndex}` : selectedGalleryIndex}.jpg`}
+              alt={`Powiększenie z galerii ${selectedGalleryIndex}`} 
+              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl pointer-events-auto select-none"
+              draggable="false"
+              onError={(e) => { 
+                e.target.style.display = 'none'; 
+                e.target.nextSibling.style.display = 'flex'; 
+              }} 
             />
+            <div className="hidden absolute inset-0 flex-col items-center justify-center text-zinc-500">
+              <Camera size={48} className="mb-4 opacity-50" />
+              <p>Brak zdjęcia</p>
+            </div>
           </div>
         </div>
       )}
