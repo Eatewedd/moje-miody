@@ -78,7 +78,7 @@ const getEnvVar = (key, fallback) => {
       return import.meta.env[key];
     }
   } catch (e) {
-    // Ignore errors in environments where import.meta is not available
+    // Ignore errors
   }
   return fallback;
 };
@@ -95,7 +95,14 @@ const WEB3FORMS_KEY = getEnvVar('VITE_WEB3FORMS_KEY', '');
 export default function App() {
   // Nawigacja Główna
   const [activePage, setActivePage] = useState('shop'); 
+  
+  // Stany nakładek (Overlays)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
+  const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(null);
+
+  const [checkoutStep, setCheckoutStep] = useState('shop'); 
   
   // UX: Toast Notifications
   const [toast, setToast] = useState({ message: '', type: 'error', visible: false });
@@ -123,9 +130,6 @@ export default function App() {
       console.error("Błąd zapisu koszyka", error);
     }
   }, [cart]);
-
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [checkoutStep, setCheckoutStep] = useState('shop'); 
   
   // Formularz
   const [deliveryMethod, setDeliveryMethod] = useState('paczkomat');
@@ -133,11 +137,7 @@ export default function App() {
     name: '', email: '', phone: '', address: '', city: '', zip: '', paczkomatCode: '', pickupMessage: '', acceptTerms: false
   });
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
 
-  // Stan do galerii
-  const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(null);
-  
   // Stany dla obsługi Swipe z fizycznym przesuwaniem (Direct Manipulation) i Zoomu
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
@@ -148,6 +148,52 @@ export default function App() {
 
   // UX: Mobilne tooltipy
   const [activeTooltipId, setActiveTooltipId] = useState(null);
+
+  // --- LOGIKA HISTORY API (OBSŁUGA GESTU WSTECZ NA MOBILE) ---
+  const pushOverlayState = useCallback(() => {
+    // Zapobiegamy dodawaniu wielu pustych stanów, jeśli nakładka już jest otwarta
+    if (!window.history.state || !window.history.state.overlay) {
+      window.history.pushState({ overlay: true }, '');
+    }
+  }, []);
+
+  const openOverlay = useCallback((setterAction) => {
+    pushOverlayState();
+    setterAction();
+  }, [pushOverlayState]);
+
+  const closeAllOverlays = useCallback((e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    
+    setScale(1);
+    setSwipeOffset(0);
+
+    // Jeśli mamy wpis nakładki w historii, po prostu go cofamy.
+    // Wywoła to event 'popstate', który wyczyści stany poniżej.
+    if (window.history.state && window.history.state.overlay) {
+      window.history.back();
+    } else {
+      // Fallback
+      setIsCartOpen(false);
+      setIsSidebarOpen(false);
+      setIsLegalModalOpen(false);
+      setSelectedGalleryIndex(null);
+    }
+  }, []);
+
+  // Nasłuchiwanie na fizyczny przycisk / gest 'Wstecz'
+  useEffect(() => {
+    const handlePopState = () => {
+      setIsCartOpen(false);
+      setIsSidebarOpen(false);
+      setIsLegalModalOpen(false);
+      setSelectedGalleryIndex(null);
+      setScale(1);
+      setSwipeOffset(0);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // --- LOGIKA KOSZYKA ---
   const addToCart = (product) => {
@@ -160,6 +206,8 @@ export default function App() {
       }
       return [...prev, { ...product, quantity: 1 }];
     });
+    
+    pushOverlayState();
     setIsCartOpen(true);
   };
 
@@ -270,10 +318,9 @@ export default function App() {
     }
   };
 
-  // UX: Kopiowanie do schowka
   const handleCopyPhone = () => {
     const textArea = document.createElement("textarea");
-    textArea.value = DISPLAY_PHONE.replace(/\s/g, ''); // Kopiujemy czysty numer
+    textArea.value = DISPLAY_PHONE.replace(/\s/g, ''); 
     document.body.appendChild(textArea);
     textArea.select();
     try {
@@ -300,22 +347,16 @@ export default function App() {
     setSelectedGalleryIndex(prev => prev === 12 ? 1 : prev + 1);
   }, []);
 
-  const closeLightbox = () => {
-    setScale(1);
-    setSwipeOffset(0);
-    setSelectedGalleryIndex(null);
-  };
-
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (selectedGalleryIndex === null) return;
       if (e.key === 'ArrowLeft') handlePrevImage();
       if (e.key === 'ArrowRight') handleNextImage();
-      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'Escape') closeAllOverlays();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedGalleryIndex, handlePrevImage, handleNextImage]);
+  }, [selectedGalleryIndex, handlePrevImage, handleNextImage, closeAllOverlays]);
 
   const minSwipeDistance = 50;
 
@@ -395,11 +436,10 @@ export default function App() {
   const handleNavClick = (page) => {
     setActivePage(page);
     setCheckoutStep('shop');
-    setIsSidebarOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    closeAllOverlays();
   };
 
-  // UX: Wskaźnik Postępu
   const renderCheckoutProgressBar = (currentStep) => (
     <div className="max-w-2xl mx-auto mb-10 mt-4 px-4">
       <div className="flex items-center justify-between w-full">
@@ -428,9 +468,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-neutral-50 font-sans text-neutral-900 selection:bg-[#f2c351]">
       
-      {/* UX: TOAST NOTIFICATIONS */}
-      <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 pointer-events-none ${toast.visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-        <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-white font-medium ${toast.type === 'error' ? 'bg-red-600' : 'bg-green-600'}`}>
+      {/* UX: TOAST NOTIFICATIONS (Przeniesiono na dół ekranu) */}
+      <div className={`fixed bottom-8 sm:bottom-12 left-1/2 -translate-x-1/2 z-[110] transition-all duration-300 pointer-events-none ${toast.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-white font-medium whitespace-nowrap ${toast.type === 'error' ? 'bg-red-600' : 'bg-green-600'}`}>
           {toast.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
           {toast.message}
         </div>
@@ -442,7 +482,7 @@ export default function App() {
           
           <div className="flex items-center gap-2 sm:gap-4">
             <button 
-              onClick={() => setIsSidebarOpen(true)}
+              onClick={() => openOverlay(() => setIsSidebarOpen(true))}
               className="p-2 -ml-2 hover:bg-[#1a1a1a] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-[#e0a82e] shrink-0"
             >
               <Menu size={26} className="text-[#e0a82e]" />
@@ -464,7 +504,7 @@ export default function App() {
           {/* Koszyk */}
           {activePage === 'shop' && checkoutStep === 'shop' && (
             <button 
-              onClick={() => setIsCartOpen(true)}
+              onClick={() => openOverlay(() => setIsCartOpen(true))}
               className="relative p-2 hover:bg-[#1a1a1a] rounded-full transition-colors flex items-center gap-2"
             >
               <ShoppingBag className="text-[#e0a82e]" size={24} />
@@ -558,7 +598,7 @@ export default function App() {
                         src={imagePath} 
                         alt={`Z życia pasieki ${num}`} 
                         className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-500" 
-                        onClick={() => setSelectedGalleryIndex(num)}
+                        onClick={() => openOverlay(() => setSelectedGalleryIndex(num))}
                         onError={(e) => { 
                           e.target.style.display = 'none'; 
                           e.target.nextSibling.style.display = 'flex'; 
@@ -791,7 +831,7 @@ export default function App() {
                         <div className="mb-6 flex items-start gap-3 bg-[#e0a82e]/10 p-4 rounded-xl border border-[#e0a82e]/30">
                           <input required type="checkbox" name="acceptTerms" id="terms" checked={formData.acceptTerms} onChange={handleFormChange} className="mt-1 w-5 h-5 rounded border-[#e0a82e]/50 text-[#e0a82e] focus:ring-[#e0a82e] cursor-pointer shrink-0" />
                           <label htmlFor="terms" className="text-xs text-neutral-700 leading-tight cursor-pointer">
-                            Akceptuję <button type="button" onClick={() => setIsLegalModalOpen(true)} className="text-[#c28e1f] font-bold hover:underline">Regulamin i RODO</button>. *
+                            Akceptuję <button type="button" onClick={() => openOverlay(() => setIsLegalModalOpen(true))} className="text-[#c28e1f] font-bold hover:underline">Regulamin i RODO</button>. *
                           </label>
                         </div>
 
@@ -897,11 +937,11 @@ export default function App() {
       {/* KOSZYK (SIDEBAR Z PRAWEJ) */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setIsCartOpen(false)}></div>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={closeAllOverlays}></div>
           <div className="relative w-full max-w-md bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
             <div className="flex items-center justify-between p-6 border-b border-neutral-100">
               <h2 className="text-xl font-bold flex items-center gap-2"><ShoppingBag /> Twój koszyk</h2>
-              <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-neutral-100 rounded-full transition-colors"><X size={20} /></button>
+              <button onClick={closeAllOverlays} className="p-2 hover:bg-neutral-100 rounded-full transition-colors"><X size={20} /></button>
             </div>
             <div className="flex-grow overflow-y-auto p-6">
               {cart.length === 0 ? (
@@ -909,7 +949,7 @@ export default function App() {
                   <ShoppingBag size={64} className="opacity-20" />
                   <p className="text-lg">Twój koszyk jest pusty.</p>
                   <button 
-                    onClick={() => setIsCartOpen(false)}
+                    onClick={closeAllOverlays}
                     className="px-6 py-3 bg-black text-white font-bold rounded-xl hover:bg-[#e0a82e] hover:text-black transition-colors shadow-lg"
                   >
                     Wróć do sklepu
@@ -941,7 +981,12 @@ export default function App() {
               <div className="p-6 border-t border-neutral-100 bg-neutral-50">
                 <div className="flex justify-between text-neutral-600 mb-2 text-sm"><span>Wartość koszyka:</span><span>{cartTotal.toFixed(2)} zł</span></div>
                 <div className="flex justify-between font-bold text-xl text-black mb-6"><span>Suma (bez dostawy):</span><span>{cartTotal.toFixed(2)} zł</span></div>
-                <button onClick={() => { setIsCartOpen(false); handleNavClick('shop'); setCheckoutStep('form'); }} className="w-full py-4 bg-black text-white rounded-xl font-bold hover:bg-[#e0a82e] hover:text-black transition-colors duration-200 shadow-xl shadow-black/10">Przejdź do kasy</button>
+                <button onClick={() => { 
+                  setActivePage('shop'); 
+                  setCheckoutStep('form'); 
+                  window.scrollTo({ top: 0, behavior: 'smooth' }); 
+                  closeAllOverlays(); 
+                }} className="w-full py-4 bg-black text-white rounded-xl font-bold hover:bg-[#e0a82e] hover:text-black transition-colors duration-200 shadow-xl shadow-black/10">Przejdź do kasy</button>
               </div>
             )}
           </div>
@@ -951,7 +996,7 @@ export default function App() {
       {/* MENU NAWIGACYJNE (SIDEBAR Z LEWEJ) */}
       {isSidebarOpen && (
         <div className="fixed inset-0 z-[60] flex justify-start">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)}></div>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={closeAllOverlays}></div>
           <div className="relative w-4/5 max-w-sm bg-black h-full flex flex-col shadow-2xl animate-in slide-in-from-left duration-300 text-white">
             
             <div className="p-6 border-b border-[#1a1a1a] flex justify-between items-center">
@@ -961,7 +1006,7 @@ export default function App() {
                 </div>
                 <span className="font-bold tracking-widest uppercase text-[#e0a82e]">Menu</span>
               </div>
-              <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-zinc-400 hover:text-white rounded-full transition-colors"><X size={24} /></button>
+              <button onClick={closeAllOverlays} className="p-2 text-zinc-400 hover:text-white rounded-full transition-colors"><X size={24} /></button>
             </div>
 
             <nav className="flex flex-col p-4 space-y-2 mt-4 flex-grow">
@@ -984,14 +1029,21 @@ export default function App() {
                 <Camera size={20} /> Galeria
               </button>
               <button 
-                onClick={() => { setIsSidebarOpen(false); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
+                onClick={() => { 
+                  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); 
+                  closeAllOverlays(); 
+                }}
                 className="p-4 text-left rounded-xl text-lg font-medium text-zinc-300 hover:bg-[#1a1a1a] hover:text-white transition-colors flex items-center gap-3"
               >
                 <Smartphone size={20} /> Kontakt
               </button>
-              {/* NOWA ZAKŁADKA - REGULAMIN I RODO */}
               <button 
-                onClick={() => { setIsSidebarOpen(false); setIsLegalModalOpen(true); }}
+                onClick={() => { 
+                  // Jeśli otwieramy stąd, to pasek już dodał nam w historii 1 overlay.
+                  // Zamykamy pasek boczny i pokazujemy modal. Użytkownik nadal musi kliknąć wstecz 1 raz.
+                  setIsSidebarOpen(false); 
+                  setIsLegalModalOpen(true); 
+                }}
                 className="p-4 text-left rounded-xl text-lg font-medium text-zinc-300 hover:bg-[#1a1a1a] hover:text-white transition-colors flex items-center gap-3"
               >
                 <FileText size={20} /> Regulamin i RODO
@@ -1009,11 +1061,11 @@ export default function App() {
       {/* MODAL REGULAMINU I RODO */}
       {isLegalModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setIsLegalModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={closeAllOverlays}></div>
           <div className="relative bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-6 border-b border-neutral-100 shrink-0">
               <h3 className="text-xl font-bold text-zinc-900 font-serif">Regulamin i Polityka Prywatności</h3>
-              <button onClick={() => setIsLegalModalOpen(false)} className="p-2 hover:bg-neutral-100 rounded-full transition-colors"><X size={20} /></button>
+              <button onClick={closeAllOverlays} className="p-2 hover:bg-neutral-100 rounded-full transition-colors"><X size={20} /></button>
             </div>
             <div className="p-6 overflow-y-auto text-sm text-neutral-600 space-y-6">
               
@@ -1079,7 +1131,7 @@ export default function App() {
 
             </div>
             <div className="p-6 border-t border-neutral-100 bg-neutral-50 shrink-0 rounded-b-2xl flex justify-end">
-              <button onClick={() => setIsLegalModalOpen(false)} className="px-8 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-amber-500 hover:text-zinc-900 transition-colors">Zamknij</button>
+              <button onClick={closeAllOverlays} className="px-8 py-3 bg-zinc-900 text-white rounded-xl font-bold hover:bg-amber-500 hover:text-zinc-900 transition-colors">Zamknij</button>
             </div>
           </div>
         </div>
@@ -1095,11 +1147,11 @@ export default function App() {
         >
           <div 
             className="absolute inset-0 bg-black/95 backdrop-blur-md transition-opacity cursor-zoom-out" 
-            onClick={closeLightbox}
+            onClick={closeAllOverlays}
           ></div>
           
           <button 
-            onClick={closeLightbox} 
+            onClick={closeAllOverlays} 
             className="absolute top-4 right-4 sm:top-8 sm:right-8 p-2 text-zinc-400 hover:text-white bg-black/50 hover:bg-black rounded-full transition-all z-10"
           >
             <X size={32} />
