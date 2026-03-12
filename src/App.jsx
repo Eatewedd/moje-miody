@@ -243,7 +243,7 @@ export default function App() {
               className="flex items-center gap-3 sm:gap-5 cursor-pointer group"
               onClick={() => handleNavClick('shop')}
             >
-              <div className="w-16 h-16 sm:w-24 sm:h-24 bg-black rounded-full overflow-hidden flex items-center justify-center shrink-0 border border-[#1a1a1a] shadow-lg">
+              <div className="w-16 h-16 sm:w-24 sm:h-24 bg-black rounded-full overflow-hidden flex items-center justify-center shrink-0">
                 <img src="/logo.jpg" alt="Logo Pasieki" className="w-full h-full object-contain scale-[1.35] transition-transform duration-300 group-hover:scale-[1.45]" />
               </div>
               <div className="flex items-baseline mt-1">
