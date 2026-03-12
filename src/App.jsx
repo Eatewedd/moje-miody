@@ -92,6 +92,11 @@ const SELLER_WNI = getEnvVar('VITE_SELLER_WNI', '[Numer WNI]');
 const SITE_URL = getEnvVar('VITE_SITE_URL', 'naszepszczoly.pl');
 const WEB3FORMS_KEY = getEnvVar('VITE_WEB3FORMS_KEY', '');
 
+// Pusty stan formularza, by łatwo resetować dane
+const initialFormData = {
+  name: '', email: '', phone: '', address: '', city: '', zip: '', paczkomatCode: '', pickupMessage: '', acceptTerms: false
+};
+
 export default function App() {
   // Podstawowe stany nawigacji
   const [activePage, setActivePage] = useState('shop'); 
@@ -103,7 +108,7 @@ export default function App() {
   const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
   const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(null);
 
-  // Zastosowanie stanu do interfejsu (History API sync)
+  // --- HISTORY API INIT & POPSTATE ---
   const applyState = useCallback((state) => {
     setActivePage(state.page || 'shop');
     setCheckoutStep(state.step || 'shop');
@@ -113,7 +118,6 @@ export default function App() {
     setSelectedGalleryIndex(state.overlay === 'gallery' ? state.index : null);
   }, []);
 
-  // --- HISTORY API INIT & POPSTATE ---
   useEffect(() => {
     if (!window.history.state) {
       window.history.replaceState({ page: 'shop', step: 'shop' }, '');
@@ -122,7 +126,6 @@ export default function App() {
     }
 
     const handlePopState = (e) => {
-      // Przywraca stan przy wciśnięciu systemowego "Wstecz" (Android/Chrome)
       if (e.state) {
         applyState(e.state);
       } else {
@@ -135,7 +138,7 @@ export default function App() {
   }, [applyState]);
 
   // --- HELPERY NAWIGACJI ---
-  const navigateTo = (page, step, replace = false) => {
+  const navigateTo = useCallback((page, step, replace = false) => {
     const newState = { page, step };
     if (replace) {
       window.history.replaceState(newState, '');
@@ -144,34 +147,34 @@ export default function App() {
     }
     applyState(newState);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, [applyState]);
 
-  const openOverlay = (overlayName, extraData = {}) => {
+  const openOverlay = useCallback((overlayName, extraData = {}) => {
     const newState = { page: activePage, step: checkoutStep, overlay: overlayName, ...extraData };
     window.history.pushState(newState, '');
     applyState(newState);
-  };
+  }, [activePage, checkoutStep, applyState]);
 
-  const replaceOverlayWithPage = (page, step) => {
+  const replaceOverlayWithPage = useCallback((page, step) => {
     const newState = { page, step };
     window.history.replaceState(newState, '');
     applyState(newState);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, [applyState]);
 
-  const replaceOverlayWithOverlay = (overlayName) => {
+  const replaceOverlayWithOverlay = useCallback((overlayName) => {
     const newState = { page: activePage, step: checkoutStep, overlay: overlayName };
     window.history.replaceState(newState, '');
     applyState(newState);
-  };
+  }, [activePage, checkoutStep, applyState]);
 
-  const handleCloseOverlay = () => {
+  const handleCloseOverlay = useCallback(() => {
     if (window.history.state?.overlay) {
-      window.history.back(); // Zrzucenie overlay'a naturalnie używając przeglądarki
+      window.history.back(); 
     } else {
       applyState({ page: activePage, step: checkoutStep }); 
     }
-  };
+  }, [activePage, checkoutStep, applyState]);
 
   // --- POZOSTAŁE STANY ---
   const [toast, setToast] = useState({ message: '', type: 'error', visible: false });
@@ -198,10 +201,16 @@ export default function App() {
     }
   }, [cart]);
 
+  // --- OCHRONA PRZED COFANIEM W CZASIE (STATE GUARD) ---
+  useEffect(() => {
+    // Jeżeli użytkownik wejdzie wstecz (lub przez link) na etap kasy, mając pusty koszyk
+    if ((checkoutStep === 'form' || checkoutStep === 'blik') && cart.length === 0) {
+      replaceOverlayWithPage('shop', 'shop');
+    }
+  }, [checkoutStep, cart.length, replaceOverlayWithPage]);
+
   const [deliveryMethod, setDeliveryMethod] = useState('paczkomat');
-  const [formData, setFormData] = useState({
-    name: '', email: '', phone: '', address: '', city: '', zip: '', paczkomatCode: '', pickupMessage: '', acceptTerms: false
-  });
+  const [formData, setFormData] = useState(initialFormData);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [touchStart, setTouchStart] = useState(null);
@@ -225,7 +234,10 @@ export default function App() {
     });
     
     showToast(`Dodano: ${product.name}`, 'success');
-    openOverlay('cart');
+    
+    if (!isCartOpen) {
+      openOverlay('cart');
+    }
   };
 
   const removeFromCart = (productId) => setCart(prev => prev.filter(item => item.id !== productId));
@@ -300,8 +312,9 @@ export default function App() {
       if (!apiKey) {
         setTimeout(() => {
            setCart([]);
+           setFormData(initialFormData); // HARD RESET formularza
            setIsProcessing(false);
-           navigateTo('shop', 'success');
+           navigateTo('shop', 'success', true);
         }, 1500);
         return;
       }
@@ -319,7 +332,8 @@ export default function App() {
 
       if (response.ok) {
         setCart([]);
-        navigateTo('shop', 'success');
+        setFormData(initialFormData); // HARD RESET formularza
+        navigateTo('shop', 'success', true);
       } else {
         showToast("Wystąpił problem z wysłaniem zamówienia. Skontaktuj się z nami telefonicznie.", "error");
       }
@@ -345,13 +359,12 @@ export default function App() {
     document.body.removeChild(textArea);
   };
 
-  // --- LOGIKA GALERII (Swipe, Zoom i nawigacja bez zaśmiecania historii) ---
+  // --- LOGIKA GALERII ---
   const handlePrevImage = useCallback(() => {
     setScale(1); 
     setSwipeOffset(0);
     setIsSwiping(false);
     const nextIdx = selectedGalleryIndex === 1 ? 12 : selectedGalleryIndex - 1;
-    // Zmieniamy tylko indeks, bez dodawania nowego rekordu Wstecz
     const newState = { page: activePage, step: checkoutStep, overlay: 'gallery', index: nextIdx };
     window.history.replaceState(newState, '');
     applyState(newState);
@@ -376,7 +389,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedGalleryIndex, handlePrevImage, handleNextImage]);
+  }, [selectedGalleryIndex, handlePrevImage, handleNextImage, handleCloseOverlay]);
 
   const minSwipeDistance = 50;
 
@@ -481,8 +494,8 @@ export default function App() {
   return (
     <div className="min-h-screen bg-neutral-50 font-sans text-neutral-900 selection:bg-[#f2c351]">
       
-      {/* UX: TOAST NOTIFICATIONS (Przeniesiono do góry, żeby niczego nie zasłaniał!) */}
-      <div className={`fixed top-[90px] sm:top-24 left-1/2 -translate-x-1/2 z-[200] transition-all duration-300 pointer-events-none ${toast.visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-8'}`}>
+      {/* UX: TOAST NOTIFICATIONS */}
+      <div className={`fixed bottom-[160px] sm:bottom-12 left-1/2 -translate-x-1/2 z-[200] transition-all duration-300 pointer-events-none ${toast.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
         <div className={`flex items-center gap-3 px-6 py-4 rounded-full shadow-2xl text-white font-medium whitespace-nowrap ${toast.type === 'error' ? 'bg-red-600' : 'bg-green-600 border border-green-500/50'}`}>
           {toast.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
           {toast.message}
@@ -745,7 +758,7 @@ export default function App() {
                 {renderCheckoutProgressBar('form')}
                 
                 <button 
-                  onClick={() => window.history.back()}
+                  onClick={() => replaceOverlayWithPage('shop', 'shop')}
                   className="text-neutral-500 hover:text-black mb-6 flex items-center gap-2 text-sm font-medium transition-colors"
                 >
                   &larr; Wróć do sklepu
@@ -890,7 +903,7 @@ export default function App() {
                         <button onClick={submitOrderToEmail} disabled={isProcessing} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-500 transition-colors duration-200 flex justify-center items-center gap-3 disabled:opacity-70 shadow-lg shadow-green-200/50">
                           {isProcessing ? <span className="animate-pulse">Wysyłanie zamówienia...</span> : <><CheckCircle size={20} /> Przelew wysłany, zamawiam!</>}
                         </button>
-                        <button onClick={() => window.history.back()} disabled={isProcessing} className="w-full py-3 text-neutral-500 text-sm hover:text-black transition-colors font-medium">Wróć do poprawy danych</button>
+                        <button onClick={() => replaceOverlayWithPage('shop', 'form')} disabled={isProcessing} className="w-full py-3 text-neutral-500 text-sm hover:text-black transition-colors font-medium">Wróć do poprawy danych</button>
                       </div>
                     </div>
                  </div>
@@ -903,7 +916,7 @@ export default function App() {
                 <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle size={48} /></div>
                 <h2 className="text-3xl font-serif font-bold mb-4">Zamówienie przyjęte!</h2>
                 <p className="text-neutral-600 mb-8">Płatność BLIK weryfikujemy ręcznie. <br/>{deliveryMethod !== 'pickup' ? 'Szczegóły wysłaliśmy do pasieki. Niedługo bierzemy się za pakowanie pysznego miodu.' : 'Szczegóły wysłane! Skontaktujemy się z Tobą, żeby potwierdzić odbiór.'}</p>
-                <button onClick={() => navigateTo('shop', 'shop', true)} className="inline-flex items-center gap-2 px-8 py-4 bg-black text-white rounded-xl font-medium hover:bg-[#e0a82e] hover:text-black transition-colors shadow-xl">Wróć do sklepu</button>
+                <button onClick={() => replaceOverlayWithPage('shop', 'shop')} className="inline-flex items-center gap-2 px-8 py-4 bg-black text-white rounded-xl font-medium hover:bg-[#e0a82e] hover:text-black transition-colors shadow-xl">Wróć do sklepu</button>
               </div>
             )}
           </>
