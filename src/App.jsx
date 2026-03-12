@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ShoppingBag, ChevronRight, ChevronLeft, CheckCircle, ShieldCheck, Truck, Info, X, MapPin, Smartphone, Box, Menu, Camera } from 'lucide-react';
+import { ShoppingBag, ChevronRight, ChevronLeft, CheckCircle, ShieldCheck, Truck, Info, X, MapPin, Smartphone, Box, Menu, Camera, AlertCircle, Copy } from 'lucide-react';
 
 // --- WŁASNY KOMPONENT IKONY (Plaster Miodu) ---
 const HoneycombIcon = ({ size = 24, className = "" }) => (
@@ -21,8 +21,6 @@ const HoneycombIcon = ({ size = 24, className = "" }) => (
 );
 
 // --- DANE PRODUKTÓW ---
-// Flaga 'isAvailable' steruje tym, czy miód da się kupić. 
-// Brak towaru w magazynie? Zmieniasz true na false.
 const PRODUCTS = [
   {
     id: 1,
@@ -35,7 +33,7 @@ const PRODUCTS = [
     description: 'Naturalny miód wielokwiatowy z dodatkiem liofilizowanej maliny. Idealny balans słodyczy i lekkiej kwasowości.',
     weight: '430g',
     ingredients: 'Miód nektarowy wielokwiatowy 98%, malina liofilizowana 2%',
-    isAvailable: true // <--- DOSTĘPNY
+    isAvailable: true
   },
   {
     id: 2,
@@ -48,7 +46,7 @@ const PRODUCTS = [
     description: 'Miód z dodatkiem wyrazistego imbiru i orzeźwiającej cytryny. Doskonały wybór na chłodniejsze dni i wsparcie odporności.',
     weight: '430g',
     ingredients: 'Miód nektarowy wielokwiatowy 95%, cytryna liofilizowana 3%, imbir liofilizowany 2%',
-    isAvailable: false // <--- TESTOWO WYPRZEDANY (zmień na true po testach!)
+    isAvailable: false 
   },
   {
     id: 3,
@@ -61,7 +59,7 @@ const PRODUCTS = [
     description: 'Wyjątkowa kompozycja naturalnego miodu z orzeźwiającą miętą i prawdziwą czekoladą. Świetny dodatek do deserów.',
     weight: '430g',
     ingredients: 'Miód nektarowy wielokwiatowy 90%, prawdziwa czekolada 8%, mięta suszona 2%',
-    isAvailable: true // <--- DOSTĘPNY
+    isAvailable: true
   }
 ];
 
@@ -83,8 +81,33 @@ export default function App() {
   const [activePage, setActivePage] = useState('shop'); 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
-  // Koszyk i Zamówienie
-  const [cart, setCart] = useState([]);
+  // UX: Toast Notifications
+  const [toast, setToast] = useState({ message: '', type: 'error', visible: false });
+
+  const showToast = useCallback((message, type = 'error') => {
+    setToast({ message, type, visible: true });
+    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 4000);
+  }, []);
+
+  // UX: Local Storage Persistence dla Koszyka
+  const [cart, setCart] = useState(() => {
+    try {
+      const savedCart = localStorage.getItem('pasieka_cart');
+      return savedCart ? JSON.parse(savedCart) : [];
+    } catch (error) {
+      console.error("Błąd ładowania koszyka", error);
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pasieka_cart', JSON.stringify(cart));
+    } catch (error) {
+      console.error("Błąd zapisu koszyka", error);
+    }
+  }, [cart]);
+
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState('shop'); 
   
@@ -96,16 +119,22 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
 
-  // Stan do powiększania zdjęć w galerii
+  // Stan do galerii
   const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(null);
   
-  // Stany dla obsługi swipe'a (przesunięcia palcem)
+  // Stany dla obsługi Swipe z fizycznym przesuwaniem (Direct Manipulation) i Zoomu
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [pinchDist, setPinchDist] = useState(null);
+
+  // UX: Mobilne tooltipy
+  const [activeTooltipId, setActiveTooltipId] = useState(null);
 
   // --- LOGIKA KOSZYKA ---
   const addToCart = (product) => {
-    // Podwójne zabezpieczenie, żeby haker nie dodał produktu, którego nie ma
     if (!product.isAvailable) return; 
 
     setCart(prev => {
@@ -134,19 +163,33 @@ export default function App() {
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const currentShippingCost = SHIPPING_COSTS[deliveryMethod];
 
-  // --- OBSŁUGA FORMULARZY ---
+  // --- OBSŁUGA FORMULARZY I UX MASKS ---
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    let formattedValue = value;
+
+    if (name === 'phone') {
+      const digits = value.replace(/\D/g, '');
+      formattedValue = digits.replace(/(\d{3})(?=\d)/g, '$1 ').substring(0, 11);
+    }
+    else if (name === 'zip') {
+      const digits = value.replace(/\D/g, '');
+      if (digits.length > 2) {
+        formattedValue = `${digits.substring(0, 2)}-${digits.substring(2, 5)}`;
+      } else {
+        formattedValue = digits;
+      }
+    }
+
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : formattedValue }));
   };
 
   const proceedToBlik = (e) => {
     e.preventDefault();
     setCheckoutStep('blik');
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // --- INTEGRACJA EMAIL ---
   const submitOrderToEmail = async () => {
     setIsProcessing(true); 
     
@@ -180,6 +223,7 @@ export default function App() {
            setCheckoutStep('success');
            setCart([]);
            setIsProcessing(false);
+           window.scrollTo({ top: 0, behavior: 'smooth' });
         }, 1500);
         return;
       }
@@ -198,64 +242,124 @@ export default function App() {
       if (response.ok) {
         setCheckoutStep('success');
         setCart([]);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
-        alert("Wystąpił problem z wysłaniem zamówienia. Skontaktuj się z nami telefonicznie.");
+        showToast("Wystąpił problem z wysłaniem zamówienia. Skontaktuj się z nami telefonicznie.", "error");
       }
     } catch (error) {
       console.error(error);
-      alert("Błąd połączenia. Spróbuj ponownie.");
+      showToast("Błąd połączenia z serwerem. Sprawdź dostęp do internetu.", "error");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // --- LOGIKA GALERII I SWIPOWANIA ---
+  // UX: Kopiowanie do schowka
+  const handleCopyPhone = () => {
+    const textArea = document.createElement("textarea");
+    textArea.value = DISPLAY_PHONE.replace(/\s/g, ''); // Kopiujemy czysty numer
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      showToast("Skopiowano numer telefonu!", "success");
+    } catch (err) {
+      showToast("Nie udało się skopiować automatycznie.", "error");
+    }
+    document.body.removeChild(textArea);
+  };
+
+  // --- LOGIKA GALERII I GESTÓW (Direct Swipe + Pinch to Zoom) ---
   const handlePrevImage = useCallback(() => {
+    setScale(1); 
+    setSwipeOffset(0);
+    setIsSwiping(false);
     setSelectedGalleryIndex(prev => prev === 1 ? 12 : prev - 1);
   }, []);
 
   const handleNextImage = useCallback(() => {
+    setScale(1);
+    setSwipeOffset(0);
+    setIsSwiping(false);
     setSelectedGalleryIndex(prev => prev === 12 ? 1 : prev + 1);
   }, []);
 
-  // Obsługa klawiatury
+  const closeLightbox = () => {
+    setScale(1);
+    setSwipeOffset(0);
+    setSelectedGalleryIndex(null);
+  };
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (selectedGalleryIndex === null) return;
       if (e.key === 'ArrowLeft') handlePrevImage();
       if (e.key === 'ArrowRight') handleNextImage();
-      if (e.key === 'Escape') setSelectedGalleryIndex(null);
+      if (e.key === 'Escape') closeLightbox();
     };
-    
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedGalleryIndex, handlePrevImage, handleNextImage]);
 
-  // Minimalny dystans przesunięcia (w pikselach), żeby uznać to za swipe
   const minSwipeDistance = 50;
 
   const onTouchStart = (e) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      setPinchDist(dist);
+      setIsSwiping(false); 
+      setTouchStart(null); 
+    } else if (e.touches.length === 1 && scale === 1) {
+      setTouchEnd(null);
+      setTouchStart(e.targetTouches[0].clientX);
+      setIsSwiping(true);
+      setSwipeOffset(0);
+    }
   };
 
   const onTouchMove = (e) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    if (e.touches.length === 2 && pinchDist) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const newScale = Math.min(Math.max(1, dist / pinchDist), 5);
+      setScale(newScale);
+    } else if (e.touches.length === 1 && scale === 1 && isSwiping && touchStart !== null) {
+      const currentX = e.targetTouches[0].clientX;
+      setTouchEnd(currentX);
+      setSwipeOffset(currentX - touchStart);
+    }
   };
 
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-    
-    // Przesunięcie palcem w lewo -> następne zdjęcie
-    if (isLeftSwipe) {
-      handleNextImage();
+  const onTouchEnd = (e) => {
+    if (e.touches.length < 2) {
+      setPinchDist(null);
+      setScale(1); 
     }
-    // Przesunięcie palcem w prawo -> poprzednie zdjęcie
-    if (isRightSwipe) {
-      handlePrevImage();
+    
+    if (touchStart !== null && touchEnd !== null && scale === 1 && isSwiping) {
+      const distance = touchStart - touchEnd;
+      const isLeftSwipe = swipeOffset < -minSwipeDistance;
+      const isRightSwipe = swipeOffset > minSwipeDistance;
+      
+      if (isLeftSwipe) {
+        handleNextImage();
+      } else if (isRightSwipe) {
+        handlePrevImage();
+      } else {
+        setSwipeOffset(0);
+        setIsSwiping(false);
+      }
+      
+      setTouchStart(null);
+      setTouchEnd(null);
+    } else {
+      setIsSwiping(false);
+      setSwipeOffset(0);
     }
   };
 
@@ -276,18 +380,51 @@ export default function App() {
     setActivePage(page);
     setCheckoutStep('shop');
     setIsSidebarOpen(false);
-    window.scrollTo(0,0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // UX: Wskaźnik Postępu
+  const renderCheckoutProgressBar = (currentStep) => (
+    <div className="max-w-2xl mx-auto mb-10 mt-4 px-4">
+      <div className="flex items-center justify-between w-full">
+        <div className={`flex flex-col items-center gap-2 ${currentStep === 'form' || currentStep === 'blik' ? 'text-black' : 'text-neutral-400'}`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${currentStep === 'form' || currentStep === 'blik' ? 'bg-[#e0a82e] text-black shadow-md' : 'bg-neutral-200'}`}>1</div>
+          <span className="text-xs font-bold uppercase tracking-wider hidden sm:block">Dane</span>
+        </div>
+        
+        <div className={`flex-grow h-1 mx-2 sm:mx-4 rounded-full ${currentStep === 'blik' ? 'bg-[#e0a82e]' : 'bg-neutral-200'}`}></div>
+        
+        <div className={`flex flex-col items-center gap-2 ${currentStep === 'blik' ? 'text-black' : 'text-neutral-400'}`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${currentStep === 'blik' ? 'bg-[#e0a82e] text-black shadow-md' : 'bg-neutral-200'}`}>2</div>
+          <span className="text-xs font-bold uppercase tracking-wider hidden sm:block">Płatność</span>
+        </div>
+        
+        <div className="flex-grow h-1 mx-2 sm:mx-4 rounded-full bg-neutral-200"></div>
+        
+        <div className="flex flex-col items-center gap-2 text-neutral-400">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-neutral-200">3</div>
+          <span className="text-xs font-bold uppercase tracking-wider hidden sm:block">Gotowe</span>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-neutral-50 font-sans text-neutral-900 selection:bg-[#f2c351]">
       
+      {/* UX: TOAST NOTIFICATIONS */}
+      <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 pointer-events-none ${toast.visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+        <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-white font-medium ${toast.type === 'error' ? 'bg-red-600' : 'bg-green-600'}`}>
+          {toast.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
+          {toast.message}
+        </div>
+      </div>
+
       {/* NAVBAR */}
       <nav className="sticky top-0 z-40 bg-black text-[#e0a82e] shadow-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex items-center justify-between">
           
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* Przycisk Menu (Hamburger) */}
             <button 
               onClick={() => setIsSidebarOpen(true)}
               className="p-2 -ml-2 hover:bg-[#1a1a1a] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-[#e0a82e] shrink-0"
@@ -295,12 +432,10 @@ export default function App() {
               <Menu size={26} className="text-[#e0a82e]" />
             </button>
 
-            {/* Logo z Pszczołą i Nazwa */}
             <div 
               className="flex items-center gap-3 sm:gap-5 cursor-pointer group"
               onClick={() => handleNavClick('shop')}
             >
-              {/* Usunięto border oraz shadow, żeby tło zlało się na 100% */}
               <div className="w-16 h-16 sm:w-24 sm:h-24 bg-black rounded-full overflow-hidden flex items-center justify-center shrink-0">
                 <img src="/logo.jpg" alt="Logo Pasieki" className="w-full h-full object-contain scale-[1.35] transition-transform duration-300 group-hover:scale-[1.45]" />
               </div>
@@ -398,7 +533,6 @@ export default function App() {
              
              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(num => {
-                 // Formatowanie numeru do dwóch cyfr (np. 1 -> '01', 10 -> '10')
                  const formattedNum = num < 10 ? `0${num}` : `${num}`;
                  const imagePath = `/galeria${formattedNum}.jpg`;
                  
@@ -461,16 +595,12 @@ export default function App() {
                   {PRODUCTS.map(product => (
                     <div key={product.id} className="bg-white rounded-2xl shadow-md border border-neutral-100 overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col group relative">
                       
-                      {/* ZDJĘCIE Z FILTREM, JEŚLI WYPRZEDANE */}
                       <div className={`aspect-square bg-neutral-100 relative overflow-hidden ${!product.isAvailable ? 'opacity-60 grayscale-[40%]' : ''}`}>
-                        
-                        {/* PLAKIETKA WYPRZEDANE */}
                         {!product.isAvailable && (
                           <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-sm text-[#e0a82e] text-xs font-bold px-4 py-2 rounded-full z-10 uppercase tracking-widest border border-[#e0a82e]/40 shadow-xl whitespace-nowrap">
                             Wyprzedane
                           </div>
                         )}
-
                         <ImageWithFallback 
                           src={product.image} 
                           alt={product.name} 
@@ -495,12 +625,20 @@ export default function App() {
 
                         <p className="text-sm text-neutral-500 mb-4 flex-grow leading-relaxed">{product.description}</p>
                         
-                        <div className="text-xs text-neutral-400 mb-5 border-b border-neutral-100 pb-5 flex items-center gap-1.5">
+                        <div className="text-xs text-neutral-400 mb-5 border-b border-neutral-100 pb-5 flex items-center gap-1.5 relative">
                           <span>Waga netto: {product.weight}</span>
                           {product.ingredients && (
-                            <div className="relative flex items-center group/tooltip cursor-help">
-                              <Info size={15} className="text-[#e0a82e] hover:text-[#c28e1f] transition-colors" />
-                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-3 bg-black text-white text-[11px] leading-relaxed rounded-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 z-10 text-center shadow-xl">
+                            // UX: Tooltip wyzwalany JEDYNIE na ikonce
+                            <div 
+                              className="relative flex items-center cursor-pointer group/tooltip"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveTooltipId(activeTooltipId === product.id ? null : product.id);
+                              }}
+                              onMouseLeave={() => setActiveTooltipId(null)}
+                            >
+                              <Info size={15} className={`transition-colors ${activeTooltipId === product.id ? 'text-[#c28e1f]' : 'text-[#e0a82e]'}`} />
+                              <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-3 bg-black text-white text-[11px] leading-relaxed rounded-xl transition-all duration-200 z-20 text-center shadow-xl ${activeTooltipId === product.id ? 'opacity-100 visible' : 'opacity-0 invisible lg:group-hover/tooltip:opacity-100 lg:group-hover/tooltip:visible'}`}>
                                 <span className="font-bold text-[#e0a82e] block mb-1 uppercase tracking-wider text-[9px]">Skład:</span>
                                 {product.ingredients}
                                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black"></div>
@@ -509,10 +647,12 @@ export default function App() {
                           )}
                         </div>
                         
-                        {/* ZMIENNY PRZYCISK ZALEŻNIE OD DOSTĘPNOŚCI */}
                         <button 
                           disabled={!product.isAvailable}
-                          onClick={() => addToCart(product)}
+                          onClick={() => {
+                            addToCart(product);
+                            showToast(`Dodano: ${product.name}`, 'success');
+                          }}
                           className={`w-full py-3.5 rounded-xl font-bold tracking-wide flex justify-center items-center gap-2 transition-colors duration-200 ${
                             product.isAvailable 
                               ? 'bg-black text-white hover:bg-[#e0a82e] hover:text-black shadow-lg shadow-black/10' 
@@ -532,125 +672,130 @@ export default function App() {
               </div>
             )}
 
-            {/* Formularz Zamówienia */}
+            {/* Formularz Zamówienia (KROK 2) */}
             {checkoutStep === 'form' && (
-              <div className="max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {renderCheckoutProgressBar('form')}
+                
                 <button 
-                  onClick={() => setCheckoutStep('shop')}
-                  className="text-neutral-500 hover:text-black mb-6 flex items-center gap-2 text-sm font-medium"
+                  onClick={() => {
+                    setCheckoutStep('shop');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="text-neutral-500 hover:text-black mb-6 flex items-center gap-2 text-sm font-medium transition-colors"
                 >
                   &larr; Wróć do sklepu
                 </button>
                 
-                <div className="bg-white rounded-3xl shadow-sm border border-neutral-100 p-6 sm:p-10">
-                  <h2 className="text-2xl font-bold mb-8">Dane do zamówienia</h2>
-                  
-                  <form onSubmit={proceedToBlik} className="space-y-6">
-                    <div className="mb-8">
-                      <label className="block text-sm font-medium text-neutral-700 mb-3">Sposób dostawy</label>
-                      <div className="grid sm:grid-cols-3 gap-3">
-                        <button type="button" onClick={() => setDeliveryMethod('paczkomat')} className={`p-3 sm:p-4 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all text-center ${deliveryMethod === 'paczkomat' ? 'border-[#e0a82e] bg-[#e0a82e]/10 text-[#5e420b]' : 'border-neutral-200 hover:border-neutral-300 text-neutral-600'}`}>
-                          <Box className={deliveryMethod === 'paczkomat' ? 'text-[#e0a82e]' : 'text-neutral-400'} size={28} />
-                          <div><div className="font-bold text-sm">Paczkomat</div><div className="text-xs opacity-80">{SHIPPING_COSTS.paczkomat.toFixed(2)} zł</div></div>
-                        </button>
-                        <button type="button" onClick={() => setDeliveryMethod('kurier')} className={`p-3 sm:p-4 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all text-center ${deliveryMethod === 'kurier' ? 'border-[#e0a82e] bg-[#e0a82e]/10 text-[#5e420b]' : 'border-neutral-200 hover:border-neutral-300 text-neutral-600'}`}>
-                          <Truck className={deliveryMethod === 'kurier' ? 'text-[#e0a82e]' : 'text-neutral-400'} size={28} />
-                          <div><div className="font-bold text-sm">Kurier</div><div className="text-xs opacity-80">{SHIPPING_COSTS.kurier.toFixed(2)} zł</div></div>
-                        </button>
-                        <button type="button" onClick={() => setDeliveryMethod('pickup')} className={`p-3 sm:p-4 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all text-center ${deliveryMethod === 'pickup' ? 'border-[#e0a82e] bg-[#e0a82e]/10 text-[#5e420b]' : 'border-neutral-200 hover:border-neutral-300 text-neutral-600'}`}>
-                          <MapPin className={deliveryMethod === 'pickup' ? 'text-[#e0a82e]' : 'text-neutral-400'} size={28} />
-                          <div><div className="font-bold text-sm leading-tight">Odbiór<br className="hidden sm:block"/> osobisty</div><div className="text-xs opacity-80 mt-0.5">Za darmo</div></div>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid sm:grid-cols-2 gap-6">
-                      <div className="space-y-2 sm:col-span-2">
-                        <label className="text-sm font-medium text-neutral-700">Imię i nazwisko</label>
-                        <input required type="text" name="name" value={formData.name} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all" />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-neutral-700">Twój telefon</label>
-                        <input required type="tel" name="phone" value={formData.phone} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all" />
+                <form onSubmit={proceedToBlik} className="relative">
+                  <div className="grid lg:grid-cols-3 gap-8 items-start">
+                    
+                    <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-neutral-100 p-6 sm:p-10">
+                      <h2 className="text-2xl font-bold mb-8">Dane do zamówienia</h2>
+                      
+                      <div className="mb-8">
+                        <label className="block text-sm font-medium text-neutral-700 mb-3">Sposób dostawy</label>
+                        <div className="grid sm:grid-cols-3 gap-3">
+                          <button type="button" onClick={() => setDeliveryMethod('paczkomat')} className={`p-3 sm:p-4 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all text-center ${deliveryMethod === 'paczkomat' ? 'border-[#e0a82e] bg-[#e0a82e]/10 text-[#5e420b]' : 'border-neutral-200 hover:border-neutral-300 text-neutral-600'}`}>
+                            <Box className={deliveryMethod === 'paczkomat' ? 'text-[#e0a82e]' : 'text-neutral-400'} size={28} />
+                            <div><div className="font-bold text-sm">Paczkomat</div><div className="text-xs opacity-80">{SHIPPING_COSTS.paczkomat.toFixed(2)} zł</div></div>
+                          </button>
+                          <button type="button" onClick={() => setDeliveryMethod('kurier')} className={`p-3 sm:p-4 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all text-center ${deliveryMethod === 'kurier' ? 'border-[#e0a82e] bg-[#e0a82e]/10 text-[#5e420b]' : 'border-neutral-200 hover:border-neutral-300 text-neutral-600'}`}>
+                            <Truck className={deliveryMethod === 'kurier' ? 'text-[#e0a82e]' : 'text-neutral-400'} size={28} />
+                            <div><div className="font-bold text-sm">Kurier</div><div className="text-xs opacity-80">{SHIPPING_COSTS.kurier.toFixed(2)} zł</div></div>
+                          </button>
+                          <button type="button" onClick={() => setDeliveryMethod('pickup')} className={`p-3 sm:p-4 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all text-center ${deliveryMethod === 'pickup' ? 'border-[#e0a82e] bg-[#e0a82e]/10 text-[#5e420b]' : 'border-neutral-200 hover:border-neutral-300 text-neutral-600'}`}>
+                            <MapPin className={deliveryMethod === 'pickup' ? 'text-[#e0a82e]' : 'text-neutral-400'} size={28} />
+                            <div><div className="font-bold text-sm leading-tight">Odbiór<br className="hidden sm:block"/> osobisty</div><div className="text-xs opacity-80 mt-0.5">Za darmo</div></div>
+                          </button>
+                        </div>
                       </div>
 
-                      {deliveryMethod === 'paczkomat' && (
-                        <>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-neutral-700">Adres E-mail</label>
-                            <input required type="email" name="email" value={formData.email} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all" />
-                          </div>
-                          <div className="space-y-2 sm:col-span-2">
+                      <div className="grid sm:grid-cols-2 gap-6 relative min-h-[300px]">
+                        <div className="space-y-2 sm:col-span-2">
+                          <label className="text-sm font-medium text-neutral-700">Imię i nazwisko</label>
+                          <input required type="text" name="name" value={formData.name} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-neutral-700">Twój telefon</label>
+                          <input required inputMode="numeric" type="tel" name="phone" value={formData.phone} onChange={handleFormChange} placeholder="XXX XXX XXX" className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-neutral-700">Adres E-mail</label>
+                          <input required type="email" name="email" value={formData.email} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all" />
+                        </div>
+
+                        {deliveryMethod === 'paczkomat' && (
+                          <div className="space-y-2 sm:col-span-2 animate-in fade-in slide-in-from-top-2 duration-300">
                             <label className="text-sm font-medium text-neutral-700 flex items-center justify-between">
                               <span>Kod Paczkomatu (np. WAW123M)</span>
                               <a href="https://inpost.pl/znajdz-paczkomat" target="_blank" rel="noreferrer" className="text-xs text-[#c28e1f] hover:underline">Znajdź kod</a>
                             </label>
                             <input required type="text" name="paczkomatCode" value={formData.paczkomatCode} onChange={handleFormChange} placeholder="Wpisz kod Paczkomatu" className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all uppercase" />
                           </div>
-                        </>
-                      )}
+                        )}
 
-                      {deliveryMethod === 'kurier' && (
-                        <>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-neutral-700">Adres E-mail</label>
-                            <input required type="email" name="email" value={formData.email} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all" />
+                        {deliveryMethod === 'kurier' && (
+                          <div className="sm:col-span-2 grid sm:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="space-y-2 sm:col-span-2">
+                              <label className="text-sm font-medium text-neutral-700">Ulica i numer domu/mieszkania</label>
+                              <input required type="text" name="address" value={formData.address} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all" />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-neutral-700">Kod pocztowy</label>
+                              <input required inputMode="numeric" type="text" name="zip" value={formData.zip} onChange={handleFormChange} placeholder="XX-XXX" className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all" />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-neutral-700">Miasto</label>
+                              <input required type="text" name="city" value={formData.city} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all" />
+                            </div>
                           </div>
-                          <div className="space-y-2 sm:col-span-2">
-                            <label className="text-sm font-medium text-neutral-700">Ulica i numer domu/mieszkania</label>
-                            <input required type="text" name="address" value={formData.address} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all" />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-neutral-700">Kod pocztowy</label>
-                            <input required type="text" name="zip" value={formData.zip} onChange={handleFormChange} placeholder="00-000" className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all" />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-neutral-700">Miasto</label>
-                            <input required type="text" name="city" value={formData.city} onChange={handleFormChange} className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all" />
-                          </div>
-                        </>
-                      )}
+                        )}
 
-                      {deliveryMethod === 'pickup' && (
-                        <div className="space-y-2 sm:col-span-2 mt-2">
-                          <label className="text-sm font-medium text-neutral-700">Kiedy chciałbyś odebrać miód?</label>
-                          <textarea required name="pickupMessage" value={formData.pickupMessage} onChange={handleFormChange} rows="3" placeholder="Napisz, w jaki dzień i o której godzinie mniej więcej wpadniesz..." className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all resize-none" />
-                        </div>
-                      )}
+                        {deliveryMethod === 'pickup' && (
+                          <div className="space-y-2 sm:col-span-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <label className="text-sm font-medium text-neutral-700">Kiedy chciałbyś odebrać miód?</label>
+                            <textarea required name="pickupMessage" value={formData.pickupMessage} onChange={handleFormChange} rows="3" placeholder="Napisz, w jaki dzień i o której godzinie mniej więcej wpadniesz..." className="w-full p-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all resize-none" />
+                          </div>
+                        )}
+                      </div>
                     </div>
-
-                    <div className="mt-8 pt-8 border-t border-neutral-100">
-                      <div className="bg-neutral-50 p-6 rounded-2xl mb-8">
-                        <h3 className="font-bold text-lg mb-4">Podsumowanie</h3>
-                        <div className="space-y-3 text-sm">
-                          <div className="flex justify-between text-neutral-600"><span>Wartość produktów:</span><span>{cartTotal.toFixed(2)} zł</span></div>
+                    
+                    <div className="lg:col-span-1 lg:sticky lg:top-28 space-y-6">
+                      <div className="bg-neutral-50 p-6 rounded-3xl border border-neutral-200 shadow-sm">
+                        <h3 className="font-bold text-lg mb-6 pb-4 border-b border-neutral-200">Podsumowanie</h3>
+                        <div className="space-y-4 text-sm mb-6">
+                          <div className="flex justify-between text-neutral-600"><span>Wartość koszyka:</span><span className="font-medium">{cartTotal.toFixed(2)} zł</span></div>
                           <div className="flex justify-between text-neutral-600">
                             <span>{deliveryMethod === 'paczkomat' && 'Paczkomat:'}{deliveryMethod === 'kurier' && 'Kurier:'}{deliveryMethod === 'pickup' && 'Odbiór osobisty:'}</span>
-                            <span>{currentShippingCost > 0 ? `${currentShippingCost.toFixed(2)} zł` : 'Za darmo'}</span>
+                            <span className="font-medium">{currentShippingCost > 0 ? `${currentShippingCost.toFixed(2)} zł` : 'Za darmo'}</span>
                           </div>
-                          <div className="flex justify-between text-xl font-bold text-black pt-3 border-t border-neutral-200"><span>Do zapłaty:</span><span>{(cartTotal + currentShippingCost).toFixed(2)} zł</span></div>
+                          <div className="flex justify-between text-xl font-bold text-black pt-4 border-t border-neutral-200"><span>Do zapłaty:</span><span>{(cartTotal + currentShippingCost).toFixed(2)} zł</span></div>
                         </div>
-                      </div>
 
-                      <div className="mb-8 flex items-start gap-3 bg-[#e0a82e]/10 p-4 rounded-xl border border-[#e0a82e]/30">
-                        <input required type="checkbox" name="acceptTerms" id="terms" checked={formData.acceptTerms} onChange={handleFormChange} className="mt-1 w-5 h-5 rounded border-[#e0a82e]/50 text-[#e0a82e] focus:ring-[#e0a82e] cursor-pointer shrink-0" />
-                        <label htmlFor="terms" className="text-sm text-neutral-700 leading-tight cursor-pointer">
-                          Akceptuję <button type="button" onClick={() => setIsLegalModalOpen(true)} className="text-[#c28e1f] font-bold hover:underline">Regulamin sklepu i Politykę Prywatności</button>. Wiem, że zamówienie wiąże się z obowiązkiem zapłaty. *
-                        </label>
-                      </div>
+                        <div className="mb-6 flex items-start gap-3 bg-[#e0a82e]/10 p-4 rounded-xl border border-[#e0a82e]/30">
+                          <input required type="checkbox" name="acceptTerms" id="terms" checked={formData.acceptTerms} onChange={handleFormChange} className="mt-1 w-5 h-5 rounded border-[#e0a82e]/50 text-[#e0a82e] focus:ring-[#e0a82e] cursor-pointer shrink-0" />
+                          <label htmlFor="terms" className="text-xs text-neutral-700 leading-tight cursor-pointer">
+                            Akceptuję <button type="button" onClick={() => setIsLegalModalOpen(true)} className="text-[#c28e1f] font-bold hover:underline">Regulamin i RODO</button>. *
+                          </label>
+                        </div>
 
-                      <button type="submit" className="w-full py-4 bg-black text-white rounded-xl font-bold text-lg hover:bg-[#e0a82e] hover:text-black transition-colors duration-200 flex justify-center items-center gap-2 shadow-xl shadow-black/10">
-                        Przejdź do płatności <ChevronRight size={20} />
-                      </button>
+                        <button type="submit" className="w-full py-4 bg-black text-white rounded-xl font-bold hover:bg-[#e0a82e] hover:text-black transition-colors duration-200 flex justify-center items-center gap-2 shadow-xl shadow-black/10">
+                          Zamawiam i płacę <ChevronRight size={20} />
+                        </button>
+                      </div>
                     </div>
-                  </form>
-                </div>
+
+                  </div>
+                </form>
               </div>
             )}
 
             {/* Płatność */}
             {checkoutStep === 'blik' && (
-              <div className="max-w-xl mx-auto animate-in zoom-in-95 duration-500 mt-8 sm:mt-12">
+              <div className="max-w-xl mx-auto animate-in fade-in duration-500 mt-4 sm:mt-12">
+                 {renderCheckoutProgressBar('blik')}
+                 
                  <div className="bg-white rounded-3xl shadow-xl border border-neutral-100 overflow-hidden">
                     <div className="bg-black p-8 text-center text-white relative">
                       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#b8861b] via-[#f2c351] to-[#b8861b]"></div>
@@ -659,22 +804,32 @@ export default function App() {
                       <p className="text-4xl text-[#e0a82e] font-bold">{(cartTotal + currentShippingCost).toFixed(2)} zł</p>
                     </div>
                     <div className="p-6 sm:p-10">
-                      <div className="bg-[#e0a82e]/10 border border-[#e0a82e]/30 rounded-2xl p-6 mb-8 text-neutral-800">
-                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Info className="text-[#e0a82e]" /> Jak opłacić zamówienie?</h3>
-                        <ol className="list-decimal pl-5 space-y-3 text-sm sm:text-base">
-                          <li>Otwórz aplikację swojego banku na telefonie.</li>
-                          <li>Wybierz opcję <strong>"Przelew na telefon BLIK"</strong>.</li>
-                          <li>Jako odbiorcę wpisz numer: <strong className="text-lg whitespace-nowrap bg-white px-2 py-1 rounded border border-[#e0a82e]/30">{DISPLAY_PHONE}</strong></li>
-                          <li>Przelej dokładną kwotę: <strong>{(cartTotal + currentShippingCost).toFixed(2)} zł</strong></li>
-                          <li>W tytule przelewu wpisz swoje imię i nazwisko.</li>
-                          <li>Po wykonaniu przelewu kliknij zielony przycisk poniżej!</li>
-                        </ol>
+                      <div className="bg-[#e0a82e]/10 border border-[#e0a82e]/30 rounded-2xl p-6 mb-8 text-neutral-800 text-center">
+                        <h3 className="font-bold text-lg mb-6 flex justify-center items-center gap-2"><Info className="text-[#e0a82e]" /> Zrób przelew na ten numer:</h3>
+                        
+                        <button 
+                           type="button"
+                           onClick={handleCopyPhone}
+                           className="group flex flex-col sm:flex-row items-center justify-center gap-3 mx-auto mb-6 bg-white p-4 rounded-xl border border-[#e0a82e]/40 hover:border-[#e0a82e] hover:shadow-lg transition-all"
+                           title="Kliknij, aby skopiować numer"
+                        >
+                          <span className="text-2xl font-black tracking-wider text-black">{DISPLAY_PHONE}</span>
+                          <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#c28e1f] bg-[#e0a82e]/10 px-3 py-1.5 rounded-lg group-hover:bg-[#e0a82e] group-hover:text-black transition-colors">
+                            <Copy size={14} /> Kopiuj numer
+                          </span>
+                        </button>
+                        
+                        <p className="text-sm sm:text-base text-neutral-600 mb-2">W tytule przelewu wpisz: <strong className="text-black">{formData.name}</strong></p>
+                        <p className="text-sm text-neutral-500">Po zleceniu przelewu w aplikacji banku, poinformuj nas o tym przyciskiem poniżej.</p>
                       </div>
                       <div className="space-y-4">
                         <button onClick={submitOrderToEmail} disabled={isProcessing} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-500 transition-colors duration-200 flex justify-center items-center gap-3 disabled:opacity-70 shadow-lg shadow-green-200/50">
-                          {isProcessing ? <span className="animate-pulse">Wysyłanie zamówienia...</span> : <><CheckCircle size={20} /> Potwierdzam i wysyłam zamówienie</>}
+                          {isProcessing ? <span className="animate-pulse">Wysyłanie zamówienia...</span> : <><CheckCircle size={20} /> Przelew wysłany, zamawiam!</>}
                         </button>
-                        <button onClick={() => setCheckoutStep('form')} disabled={isProcessing} className="w-full py-3 text-neutral-500 text-sm hover:text-black transition-colors font-medium">Wróć do poprawy danych</button>
+                        <button onClick={() => {
+                          setCheckoutStep('form');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }} disabled={isProcessing} className="w-full py-3 text-neutral-500 text-sm hover:text-black transition-colors font-medium">Wróć do poprawy danych</button>
                       </div>
                     </div>
                  </div>
@@ -687,7 +842,7 @@ export default function App() {
                 <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle size={48} /></div>
                 <h2 className="text-3xl font-serif font-bold mb-4">Zamówienie przyjęte!</h2>
                 <p className="text-neutral-600 mb-8">Płatność BLIK weryfikujemy ręcznie. <br/>{deliveryMethod !== 'pickup' ? 'Szczegóły wysłaliśmy do pasieki. Niedługo bierzemy się za pakowanie pysznego miodu.' : 'Szczegóły wysłane! Skontaktujemy się z Tobą, żeby potwierdzić odbiór.'}</p>
-                <button onClick={() => handleNavClick('shop')} className="inline-flex items-center gap-2 px-8 py-4 bg-black text-white rounded-xl font-medium hover:bg-[#e0a82e] hover:text-black transition-colors">Wróć do sklepu</button>
+                <button onClick={() => handleNavClick('shop')} className="inline-flex items-center gap-2 px-8 py-4 bg-black text-white rounded-xl font-medium hover:bg-[#e0a82e] hover:text-black transition-colors shadow-xl">Wróć do sklepu</button>
               </div>
             )}
           </>
@@ -735,7 +890,16 @@ export default function App() {
             </div>
             <div className="flex-grow overflow-y-auto p-6">
               {cart.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-neutral-400 space-y-4"><ShoppingBag size={48} className="opacity-20" /><p>Koszyk jest pusty.</p></div>
+                <div className="h-full flex flex-col items-center justify-center text-neutral-400 space-y-6">
+                  <ShoppingBag size={64} className="opacity-20" />
+                  <p className="text-lg">Twój koszyk jest pusty.</p>
+                  <button 
+                    onClick={() => setIsCartOpen(false)}
+                    className="px-6 py-3 bg-black text-white font-bold rounded-xl hover:bg-[#e0a82e] hover:text-black transition-colors shadow-lg"
+                  >
+                    Wróć do sklepu
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-6">
                   {cart.map(item => (
@@ -805,7 +969,7 @@ export default function App() {
                 <Camera size={20} /> Galeria
               </button>
               <button 
-                onClick={() => { setIsSidebarOpen(false); window.scrollTo(0, document.body.scrollHeight); }}
+                onClick={() => { setIsSidebarOpen(false); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }}
                 className="p-4 text-left rounded-xl text-lg font-medium text-zinc-300 hover:bg-[#1a1a1a] hover:text-white transition-colors flex items-center gap-3"
               >
                 <Smartphone size={20} /> Kontakt
@@ -867,17 +1031,17 @@ export default function App() {
         >
           <div 
             className="absolute inset-0 bg-black/95 backdrop-blur-md transition-opacity cursor-zoom-out" 
-            onClick={() => setSelectedGalleryIndex(null)}
+            onClick={closeLightbox}
           ></div>
           
           <button 
-            onClick={() => setSelectedGalleryIndex(null)} 
+            onClick={closeLightbox} 
             className="absolute top-4 right-4 sm:top-8 sm:right-8 p-2 text-zinc-400 hover:text-white bg-black/50 hover:bg-black rounded-full transition-all z-10"
           >
             <X size={32} />
           </button>
 
-          {/* Przycisk Wstecz (Widoczny tylko na większych ekranach) */}
+          {/* Przycisk Wstecz */}
           <button 
             onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
             className="absolute left-4 sm:left-8 p-2 text-zinc-400 hover:text-[#e0a82e] bg-black/50 hover:bg-black rounded-full transition-all z-10 hidden sm:block"
@@ -885,7 +1049,7 @@ export default function App() {
             <ChevronLeft size={48} strokeWidth={1.5} />
           </button>
 
-          {/* Przycisk Dalej (Widoczny tylko na większych ekranach) */}
+          {/* Przycisk Dalej */}
           <button 
             onClick={(e) => { e.stopPropagation(); handleNextImage(); }}
             className="absolute right-4 sm:right-8 p-2 text-zinc-400 hover:text-[#e0a82e] bg-black/50 hover:bg-black rounded-full transition-all z-10 hidden sm:block"
@@ -895,10 +1059,16 @@ export default function App() {
           
           <div className="relative w-full h-full max-h-[90vh] flex items-center justify-center animate-in zoom-in-95 duration-300 pointer-events-none select-none">
             <img 
+              key={selectedGalleryIndex}
               src={`/galeria${selectedGalleryIndex < 10 ? `0${selectedGalleryIndex}` : selectedGalleryIndex}.jpg`}
               alt={`Powiększenie z galerii ${selectedGalleryIndex}`} 
-              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl pointer-events-auto select-none"
+              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl pointer-events-auto select-none origin-center"
               draggable="false"
+              style={{ 
+                transform: `translateX(${swipeOffset}px) scale(${scale})`, 
+                transition: (isSwiping || pinchDist) ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease-out',
+                opacity: isSwiping ? Math.max(0.4, 1 - Math.abs(swipeOffset) / (window.innerWidth || 400)) : 1
+              }}
               onError={(e) => { 
                 e.target.style.display = 'none'; 
                 e.target.nextSibling.style.display = 'flex'; 
