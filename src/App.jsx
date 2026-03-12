@@ -96,6 +96,9 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
 
+  // Stan do powiększania zdjęć w galerii
+  const [selectedImage, setSelectedImage] = useState(null);
+
   // --- LOGIKA KOSZYKA ---
   const addToCart = (product) => {
     // Podwójne zabezpieczenie, żeby haker nie dodał produktu, którego nie ma
@@ -243,6 +246,7 @@ export default function App() {
               className="flex items-center gap-3 sm:gap-5 cursor-pointer group"
               onClick={() => handleNavClick('shop')}
             >
+              {/* Usunięto border oraz shadow, żeby tło zlało się na 100% */}
               <div className="w-16 h-16 sm:w-24 sm:h-24 bg-black rounded-full overflow-hidden flex items-center justify-center shrink-0">
                 <img src="/logo.jpg" alt="Logo Pasieki" className="w-full h-full object-contain scale-[1.35] transition-transform duration-300 group-hover:scale-[1.45]" />
               </div>
@@ -342,12 +346,15 @@ export default function App() {
                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(num => {
                  // Formatowanie numeru do dwóch cyfr (np. 1 -> '01', 10 -> '10')
                  const formattedNum = num < 10 ? `0${num}` : `${num}`;
+                 const imagePath = `/galeria${formattedNum}.jpg`;
+                 
                  return (
                    <div key={num} className="aspect-square bg-zinc-100 rounded-2xl overflow-hidden relative shadow-sm border border-neutral-100 group">
                       <img 
-                        src={`/galeria${formattedNum}.jpg`} 
+                        src={imagePath} 
                         alt={`Z życia pasieki ${num}`} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                        className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-500" 
+                        onClick={() => setSelectedImage(imagePath)}
                         onError={(e) => { 
                           e.target.style.display = 'none'; 
                           e.target.nextSibling.style.display = 'flex'; 
@@ -792,6 +799,31 @@ export default function App() {
             <div className="p-6 border-t border-neutral-100 bg-neutral-50 shrink-0 rounded-b-2xl flex justify-end">
               <button onClick={() => setIsLegalModalOpen(false)} className="px-8 py-3 bg-black text-white rounded-xl font-bold hover:bg-[#e0a82e] hover:text-black transition-colors">Zamknij</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL GALERII (LIGHTBOX) */}
+      {selectedImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/95 backdrop-blur-md transition-opacity cursor-zoom-out" 
+            onClick={() => setSelectedImage(null)}
+          ></div>
+          
+          <button 
+            onClick={() => setSelectedImage(null)} 
+            className="absolute top-4 right-4 sm:top-8 sm:right-8 p-2 text-zinc-400 hover:text-white bg-black/50 hover:bg-black rounded-full transition-all z-10"
+          >
+            <X size={32} />
+          </button>
+          
+          <div className="relative w-full h-full max-h-[90vh] flex items-center justify-center animate-in zoom-in-95 duration-300 pointer-events-none">
+            <img 
+              src={selectedImage} 
+              alt="Powiększenie z galerii" 
+              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl pointer-events-auto"
+            />
           </div>
         </div>
       )}
