@@ -224,8 +224,8 @@ export default function App() {
       return [...prev, { ...product, quantity: 1 }];
     });
     
-    // Zamiast otwierać koszyk, pokazujemy elegancki toast. To świetny UX pattern.
     showToast(`Dodano: ${product.name}`, 'success');
+    openOverlay('cart');
   };
 
   const removeFromCart = (productId) => setCart(prev => prev.filter(item => item.id !== productId));
