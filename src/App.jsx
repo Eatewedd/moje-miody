@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ShoppingBag, ChevronRight, ChevronLeft, CheckCircle, ShieldCheck, Truck, Info, X, MapPin, Smartphone, Box, Menu, Camera, AlertCircle, Copy, FileText } from 'lucide-react';
+import { ShoppingBag, ChevronRight, ChevronLeft, CheckCircle, ShieldCheck, Truck, Info, X, MapPin, Smartphone, Box, Menu, Camera, AlertCircle, Copy, FileText, Tag } from 'lucide-react';
 
 // --- WŁASNY KOMPONENT IKONY (Plaster Miodu) ---
 const HoneycombIcon = ({ size = 24, className = "" }) => (
@@ -24,10 +24,10 @@ const HoneycombIcon = ({ size = 24, className = "" }) => (
 const PRODUCTS = [
   {
     id: 1,
-    name: 'Miód z Maliną', 
-    labelMain: 'MIÓD', 
+    name: 'Miód z Maliną',
+    labelMain: 'MIÓD',
     labelSub: 'Z MALINĄ',
-    labelColor: 'text-[#c2185b]', 
+    labelColor: 'text-[#c2185b]',
     price: 45.0,
     image: '/miod01.jpg',
     description: 'Naturalny miód wielokwiatowy z dodatkiem liofilizowanej maliny. Idealny balans słodyczy i lekkiej kwasowości.',
@@ -40,28 +40,35 @@ const PRODUCTS = [
     name: 'Miód z Imbirem i Cytryną',
     labelMain: 'MIÓD',
     labelSub: 'Z IMBIREM I CYTRYNĄ',
-    labelColor: 'text-[#e0a82e]', 
+    labelColor: 'text-[#e0a82e]',
     price: 45.0,
-    image: '/miod02.jpg', 
+    image: '/miod02.jpg',
     description: 'Miód z dodatkiem wyrazistego imbiru i orzeźwiającej cytryny. Doskonały wybór na chłodniejsze dni i wsparcie odporności.',
     weight: '430g',
     ingredients: 'Miód nektarowy wielokwiatowy 95%, cytryna liofilizowana 3%, imbir liofilizowany 2%',
-    isAvailable: false 
+    isAvailable: false
   },
   {
     id: 3,
     name: 'Miód z Miętą i Czekoladą',
     labelMain: 'MIÓD',
     labelSub: 'Z MIĘTĄ I CZEKOLADĄ',
-    labelColor: 'text-[#5d4037]', 
+    labelColor: 'text-[#5d4037]',
     price: 49.0,
-    image: '/miod03.jpg', 
+    image: '/miod03.jpg',
     description: 'Wyjątkowa kompozycja naturalnego miodu z orzeźwiającą miętą i prawdziwą czekoladą. Świetny dodatek do deserów.',
     weight: '430g',
     ingredients: 'Miód nektarowy wielokwiatowy 90%, prawdziwa czekolada 8%, mięta suszona 2%',
     isAvailable: true
   }
 ];
+
+// --- KODY RABATOWE (Hardcoded na ten moment) ---
+const PROMO_CODES = {
+    'WIOSNA10': 0.10, // 10% zniżki
+    // Można dodać więcej: 'STAŁYKLIENT': 0.15,
+};
+
 
 const SHIPPING_COSTS = {
   pickup: 0.0,
@@ -99,9 +106,9 @@ const initialFormData = {
 
 export default function App() {
   // Podstawowe stany nawigacji
-  const [activePage, setActivePage] = useState('shop'); 
-  const [checkoutStep, setCheckoutStep] = useState('shop'); 
-  
+  const [activePage, setActivePage] = useState('shop');
+  const [checkoutStep, setCheckoutStep] = useState('shop');
+
   // Stany nakładek (overlays)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -170,9 +177,9 @@ export default function App() {
 
   const handleCloseOverlay = useCallback(() => {
     if (window.history.state?.overlay) {
-      window.history.back(); 
+      window.history.back();
     } else {
-      applyState({ page: activePage, step: checkoutStep }); 
+      applyState({ page: activePage, step: checkoutStep });
     }
   }, [activePage, checkoutStep, applyState]);
 
@@ -192,6 +199,12 @@ export default function App() {
       return [];
     }
   });
+
+  // --- STANY KODÓW PROMOCYJNYCH ---
+  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [appliedPromoCode, setAppliedPromoCode] = useState(null);
+  const [promoError, setPromoError] = useState('');
+
 
   useEffect(() => {
     try {
@@ -221,9 +234,9 @@ export default function App() {
   const [pinchDist, setPinchDist] = useState(null);
   const [activeTooltipId, setActiveTooltipId] = useState(null);
 
-  // --- LOGIKA KOSZYKA ---
+  // --- LOGIKA KOSZYKA I KALKULACJE ---
   const addToCart = (product) => {
-    if (!product.isAvailable) return; 
+    if (!product.isAvailable) return;
 
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
@@ -232,9 +245,9 @@ export default function App() {
       }
       return [...prev, { ...product, quantity: 1 }];
     });
-    
+
     showToast(`Dodano: ${product.name}`, 'success');
-    
+
     if (!isCartOpen) {
       openOverlay('cart');
     }
@@ -252,9 +265,46 @@ export default function App() {
     }));
   };
 
+  // --- LOGIKA KODÓW PROMOCYJNYCH ---
+  const handleApplyPromoCode = (e) => {
+      e.preventDefault();
+      setPromoError('');
+      const normalizedCode = promoCodeInput.trim().toUpperCase();
+
+      if (!normalizedCode) {
+          setPromoError('Wpisz kod rabatowy.');
+          return;
+      }
+
+      if (PROMO_CODES.hasOwnProperty(normalizedCode)) {
+          setAppliedPromoCode(normalizedCode);
+          showToast(`Kod ${normalizedCode} aktywowany!`, 'success');
+      } else {
+          setPromoError('Kod jest nieprawidłowy lub wygasł.');
+          setAppliedPromoCode(null);
+      }
+  };
+
+  const removePromoCode = () => {
+      setAppliedPromoCode(null);
+      setPromoCodeInput('');
+      showToast('Kod rabatowy usunięty.', 'info');
+  }
+
+
+  // --- GŁÓWNE KALKULACJE FINANSOWE ---
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const currentShippingCost = SHIPPING_COSTS[deliveryMethod];
+
+  // Kalkulacja rabatu
+  const discountPercentage = appliedPromoCode ? PROMO_CODES[appliedPromoCode] : 0;
+  const discountAmount = cartTotal * discountPercentage;
+  const discountedCartTotal = cartTotal - discountAmount;
+
+  // Ostateczna kwota do zapłaty
+  const finalToBePaid = discountedCartTotal + currentShippingCost;
+
 
   // --- OBSŁUGA FORMULARZY I UX MASKS ---
   const handleFormChange = (e) => {
@@ -283,22 +333,27 @@ export default function App() {
   };
 
   const submitOrderToEmail = async () => {
-    setIsProcessing(true); 
-    
+    setIsProcessing(true);
+
     let deliveryName = '';
     if(deliveryMethod === 'paczkomat') deliveryName = 'Paczkomat InPost';
     if(deliveryMethod === 'kurier') deliveryName = 'Kurier InPost';
     if(deliveryMethod === 'pickup') deliveryName = 'Odbiór osobisty';
 
-    let emailBody = `Nowe zamówienie ze sklepu!\n\nKOSZYK:\n`;
+    let emailBody = `Nowe zamówienie ze sklepu!\n\nKOSZYK (Wartość: ${cartTotal.toFixed(2)} zł):\n`;
     cart.forEach(item => {
       emailBody += `- ${item.quantity}x ${item.name} (${(item.price * item.quantity).toFixed(2)} zł)\n`;
     });
-    
+
+    if (appliedPromoCode) {
+        emailBody += `\nZASTOSOWANY KOD RABATOWY: ${appliedPromoCode} (-${discountAmount.toFixed(2)} zł)\n`;
+        emailBody += `WARTOŚĆ KOSZYKA PO RABACIE: ${discountedCartTotal.toFixed(2)} zł\n`;
+    }
+
     emailBody += `\nDOSTAWA: ${deliveryName} (${currentShippingCost.toFixed(2)} zł)\n`;
-    emailBody += `DO ZAPŁATY: ${(cartTotal + currentShippingCost).toFixed(2)} zł (Opłacone BLIKiem)\n\nDANE KLIENTA:\n`;
+    emailBody += `DO ZAPŁATY (SUMA): ${finalToBePaid.toFixed(2)} zł (Opłacone BLIKiem)\n\nDANE KLIENTA:\n`;
     emailBody += `Imię i nazwisko: ${formData.name}\nTelefon: ${formData.phone}\n`;
-    
+
     if (deliveryMethod === 'paczkomat') {
       emailBody += `E-mail: ${formData.email}\nKod Paczkomatu: ${formData.paczkomatCode}\n`;
     } else if (deliveryMethod === 'kurier') {
@@ -313,6 +368,8 @@ export default function App() {
         setTimeout(() => {
            setCart([]);
            setFormData(initialFormData); // HARD RESET formularza
+           setAppliedPromoCode(null); // Reset kodu
+           setPromoCodeInput('');
            setIsProcessing(false);
            navigateTo('shop', 'success', true);
         }, 1500);
@@ -324,7 +381,7 @@ export default function App() {
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           access_key: apiKey,
-          subject: `Nowe zamówienie od: ${formData.name} - ${(cartTotal + currentShippingCost).toFixed(2)} zł`,
+          subject: `Nowe zamówienie od: ${formData.name} - ${finalToBePaid.toFixed(2)} zł`,
           from_name: "Sklep Pasieka",
           message: emailBody,
         }),
@@ -333,6 +390,8 @@ export default function App() {
       if (response.ok) {
         setCart([]);
         setFormData(initialFormData); // HARD RESET formularza
+        setAppliedPromoCode(null); // Reset kodu
+        setPromoCodeInput('');
         navigateTo('shop', 'success', true);
       } else {
         showToast("Wystąpił problem z wysłaniem zamówienia. Skontaktuj się z nami telefonicznie.", "error");
@@ -347,7 +406,7 @@ export default function App() {
 
   const handleCopyPhone = () => {
     const textArea = document.createElement("textarea");
-    textArea.value = DISPLAY_PHONE.replace(/\s/g, ''); 
+    textArea.value = DISPLAY_PHONE.replace(/\s/g, '');
     document.body.appendChild(textArea);
     textArea.select();
     try {
@@ -361,7 +420,7 @@ export default function App() {
 
   // --- LOGIKA GALERII ---
   const handlePrevImage = useCallback(() => {
-    setScale(1); 
+    setScale(1);
     setSwipeOffset(0);
     setIsSwiping(false);
     const nextIdx = selectedGalleryIndex === 1 ? 12 : selectedGalleryIndex - 1;
@@ -400,8 +459,8 @@ export default function App() {
         e.touches[0].clientY - e.touches[1].clientY
       );
       setPinchDist(dist);
-      setIsSwiping(false); 
-      setTouchStart(null); 
+      setIsSwiping(false);
+      setTouchStart(null);
     } else if (e.touches.length === 1 && scale === 1) {
       setTouchEnd(null);
       setTouchStart(e.targetTouches[0].clientX);
@@ -428,14 +487,14 @@ export default function App() {
   const onTouchEnd = (e) => {
     if (e.touches.length < 2) {
       setPinchDist(null);
-      setScale(1); 
+      setScale(1);
     }
-    
+
     if (touchStart !== null && touchEnd !== null && scale === 1 && isSwiping) {
       const distance = touchStart - touchEnd;
       const isLeftSwipe = swipeOffset < -minSwipeDistance;
       const isRightSwipe = swipeOffset > minSwipeDistance;
-      
+
       if (isLeftSwipe) {
         handleNextImage();
       } else if (isRightSwipe) {
@@ -444,7 +503,7 @@ export default function App() {
         setSwipeOffset(0);
         setIsSwiping(false);
       }
-      
+
       setTouchStart(null);
       setTouchEnd(null);
     } else {
@@ -457,9 +516,9 @@ export default function App() {
   const ImageWithFallback = ({ src, alt, className }) => {
     const [imgSrc, setImgSrc] = useState(src);
     return (
-      <img 
-        src={imgSrc} 
-        alt={alt} 
+      <img
+        src={imgSrc}
+        alt={alt}
         className={className}
         onError={() => setImgSrc("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Crect width='400' height='400' fill='%231f2937'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%23e0a82e'%3EZdjęcie Miodu%3C/text%3E%3C/svg%3E")}
       />
@@ -473,16 +532,16 @@ export default function App() {
           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${currentStep === 'form' || currentStep === 'blik' ? 'bg-[#e0a82e] text-black shadow-md' : 'bg-neutral-200'}`}>1</div>
           <span className="text-xs font-bold uppercase tracking-wider hidden sm:block">Dane</span>
         </div>
-        
+
         <div className={`flex-grow h-1 mx-2 sm:mx-4 rounded-full ${currentStep === 'blik' ? 'bg-[#e0a82e]' : 'bg-neutral-200'}`}></div>
-        
+
         <div className={`flex flex-col items-center gap-2 ${currentStep === 'blik' ? 'text-black' : 'text-neutral-400'}`}>
           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${currentStep === 'blik' ? 'bg-[#e0a82e] text-black shadow-md' : 'bg-neutral-200'}`}>2</div>
           <span className="text-xs font-bold uppercase tracking-wider hidden sm:block">Płatność</span>
         </div>
-        
+
         <div className="flex-grow h-1 mx-2 sm:mx-4 rounded-full bg-neutral-200"></div>
-        
+
         <div className="flex flex-col items-center gap-2 text-neutral-400">
           <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-neutral-200">3</div>
           <span className="text-xs font-bold uppercase tracking-wider hidden sm:block">Gotowe</span>
@@ -493,7 +552,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-50 font-sans text-neutral-900 selection:bg-[#f2c351]">
-      
+
       {/* UX: TOAST NOTIFICATIONS */}
       <div className={`fixed bottom-[160px] sm:bottom-12 left-1/2 -translate-x-1/2 z-[200] transition-all duration-300 pointer-events-none ${toast.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
         <div className={`flex items-center gap-3 px-6 py-4 rounded-full shadow-2xl text-white font-medium whitespace-nowrap ${toast.type === 'error' ? 'bg-red-600' : 'bg-green-600 border border-green-500/50'}`}>
@@ -502,19 +561,19 @@ export default function App() {
         </div>
       </div>
 
-      {/* NAVBAR */}
-      <nav className="sticky top-0 z-40 bg-black text-[#e0a82e] shadow-md">
+      {/* NAVBAR - FIX: Dodano border-b dla oddzielenia od tła */}
+      <nav className="sticky top-0 z-40 bg-black text-[#e0a82e] shadow-md border-b border-neutral-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex items-center justify-between">
-          
+
           <div className="flex items-center gap-2 sm:gap-4">
-            <button 
+            <button
               onClick={() => openOverlay('menu')}
               className="p-2 -ml-2 hover:bg-[#1a1a1a] rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-[#e0a82e] shrink-0"
             >
               <Menu size={26} className="text-[#e0a82e]" />
             </button>
 
-            <div 
+            <div
               className="flex items-center gap-3 sm:gap-5 cursor-pointer group"
               onClick={() => {
                  if (activePage !== 'shop' || checkoutStep !== 'shop') navigateTo('shop', 'shop');
@@ -531,7 +590,7 @@ export default function App() {
 
           {/* Koszyk ikona */}
           {activePage === 'shop' && checkoutStep === 'shop' && (
-            <button 
+            <button
               onClick={() => openOverlay('cart')}
               className="relative p-2 hover:bg-[#1a1a1a] rounded-full transition-colors flex items-center gap-2"
             >
@@ -549,7 +608,7 @@ export default function App() {
 
       {/* GŁÓWNA ZAWARTOŚĆ */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 min-h-[70vh]">
-        
+
         {/* WIDOK: O NAS */}
         {activePage === 'about' && (
           <div className="animate-in fade-in duration-500 max-w-3xl mx-auto py-8">
@@ -564,20 +623,20 @@ export default function App() {
               <p>
                 Pasieka powstała z pasji do pszczelarstwa i miłości do przyrody. To, co zaczęło się jako hobby, z czasem rozwinęło się w gospodarstwo pasieczne, w którym tradycyjne metody pracy łączą się z dbałością o najwyższą jakość. Każdy etap powstawania miodu – od pracy pszczół po moment, gdy trafia on do słoika – odbywa się z ogromną troską o naturę i autentyczność produktu.
               </p>
-              
+
               <div className="flex justify-center my-10">
                 <div className="w-40 h-40 bg-black rounded-full overflow-hidden border-4 border-[#e0a82e]/30 flex items-center justify-center shadow-lg">
-                   <img src="/logo.jpg" alt="Pszczoła" className="w-full h-full object-contain scale-[1.3]" />
+                    <img src="/logo.jpg" alt="Pszczoła" className="w-full h-full object-contain scale-[1.3]" />
                 </div>
               </div>
-              
+
               <p>
                 Nasze ule stacjonują w spokojnej, zielonej okolicy, z dala od zgiełku przemysłu. Dzięki temu nasze pszczoły mają doskonałe warunki do produkcji najwyższej jakości miodu.
               </p>
               <p>
                 Nasze pszczoły zbierają nektar z czystych, bogatych w roślinność terenów. Dzięki temu powstają miody o wyjątkowym aromacie, naturalnej słodyczy i niepowtarzalnym charakterze. Każdy słoik to efekt pracy tysięcy pszczół oraz gwarancja prawdziwego, naturalnego produktu.
               </p>
-              
+
               <div className="bg-[#e0a82e]/5 rounded-2xl p-6 sm:p-8 my-8 border border-[#e0a82e]/20">
                 <h3 className="font-serif font-bold text-2xl text-black mb-4">W naszej ofercie znajdziesz:</h3>
                 <ul className="list-disc pl-5 space-y-2 marker:text-[#e0a82e]">
@@ -596,7 +655,7 @@ export default function App() {
               </p>
 
               <div className="pt-8 mt-8 border-t border-neutral-100 flex justify-center">
-                <button 
+                <button
                   onClick={() => navigateTo('shop', 'shop')}
                   className="px-8 py-4 bg-[#e0a82e] text-black font-bold text-lg rounded-xl hover:bg-[#f2c351] transition-colors flex items-center gap-2 shadow-xl shadow-[#e0a82e]/20"
                 >
@@ -614,23 +673,23 @@ export default function App() {
              <p className="text-neutral-500 mb-10 text-center text-lg max-w-2xl mx-auto">
                Z życia naszej pasieki. Zobacz, jak powstaje Twój ulubiony miód i gdzie pracują nasze pszczoły.
              </p>
-             
+
              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(num => {
                  const formattedNum = num < 10 ? `0${num}` : `${num}`;
                  const imagePath = `/galeria${formattedNum}.jpg`;
-                 
+
                  return (
                    <div key={num} className="aspect-square bg-zinc-100 rounded-2xl overflow-hidden relative shadow-sm border border-neutral-100 group">
-                      <img 
-                        src={imagePath} 
-                        alt={`Z życia pasieki ${num}`} 
-                        className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-500" 
+                      <img
+                        src={imagePath}
+                        alt={`Z życia pasieki ${num}`}
+                        className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-500"
                         onClick={() => openOverlay('gallery', { index: num })}
-                        onError={(e) => { 
-                          e.target.style.display = 'none'; 
-                          e.target.nextSibling.style.display = 'flex'; 
-                        }} 
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
                       />
                       <div className="hidden absolute inset-0 bg-zinc-100 flex-col items-center justify-center text-zinc-400 p-6 text-center border-2 border-dashed border-zinc-300 m-2 rounded-xl">
                         <Camera size={32} className="mb-2 opacity-50" />
@@ -641,9 +700,9 @@ export default function App() {
                  );
                })}
              </div>
-             
+
              <div className="mt-12 flex justify-center">
-                <button 
+                <button
                   onClick={() => navigateTo('shop', 'shop')}
                   className="px-8 py-3 bg-black text-white font-bold rounded-xl hover:bg-[#e0a82e] hover:text-black transition-colors"
                 >
@@ -660,14 +719,14 @@ export default function App() {
               <div className="animate-in fade-in duration-500">
                 <div className="bg-black rounded-3xl p-8 sm:p-12 mb-8 sm:mb-12 text-center text-white relative overflow-hidden shadow-xl">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#b8861b] via-[#f2c351] to-[#b8861b]"></div>
-                  
+
                   <h2 className="text-3xl sm:text-5xl font-serif font-bold mb-4 sm:mb-6 tracking-wide">Prawdziwy miód z naszej pasieki</h2>
-                  
+
                   <p className="hidden sm:block max-w-2xl mx-auto text-zinc-400 text-lg sm:text-xl mb-8 font-light">
-                    Tworzymy miody rzemieślnicze z pasją i szacunkiem do natury. Bez sztucznych dodatków, 
+                    Tworzymy miody rzemieślnicze z pasją i szacunkiem do natury. Bez sztucznych dodatków,
                     bez kompromisów. Prosto z ula na Twój stół.
                   </p>
-                  
+
                   <div className="flex flex-col sm:flex-row flex-wrap justify-center items-center gap-4 sm:gap-8 text-sm text-zinc-300 mt-6 sm:mt-0">
                     <div className="flex items-center gap-2"><ShieldCheck className="text-[#e0a82e]" size={18} /> Gwarancja jakości</div>
                     <div className="flex items-center gap-2"><Truck className="text-[#e0a82e]" size={18} /> Paczkomat, Kurier lub Odbiór</div>
@@ -678,16 +737,16 @@ export default function App() {
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                   {PRODUCTS.map(product => (
                     <div key={product.id} className="bg-white rounded-2xl shadow-md border border-neutral-100 overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col group relative">
-                      
+
                       <div className={`aspect-square bg-neutral-100 relative overflow-hidden ${!product.isAvailable ? 'opacity-60 grayscale-[40%]' : ''}`}>
                         {!product.isAvailable && (
                           <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-sm text-[#e0a82e] text-xs font-bold px-4 py-2 rounded-full z-10 uppercase tracking-widest border border-[#e0a82e]/40 shadow-xl whitespace-nowrap">
                             Wyprzedane
                           </div>
                         )}
-                        <ImageWithFallback 
-                          src={product.image} 
-                          alt={product.name} 
+                        <ImageWithFallback
+                          src={product.image}
+                          alt={product.name}
                           className={`w-full h-full object-cover object-center transition-transform duration-500 ${product.isAvailable ? 'group-hover:scale-105' : ''}`}
                         />
                       </div>
@@ -708,11 +767,11 @@ export default function App() {
                         </div>
 
                         <p className="text-sm text-neutral-500 mb-4 flex-grow leading-relaxed">{product.description}</p>
-                        
+
                         <div className="text-xs text-neutral-400 mb-5 border-b border-neutral-100 pb-5 flex items-center gap-1.5 relative">
                           <span>Waga netto: {product.weight}</span>
                           {product.ingredients && (
-                            <div 
+                            <div
                               className="relative flex items-center cursor-pointer group/tooltip"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -729,13 +788,13 @@ export default function App() {
                             </div>
                           )}
                         </div>
-                        
-                        <button 
+
+                        <button
                           disabled={!product.isAvailable}
                           onClick={() => addToCart(product)}
                           className={`w-full py-3.5 rounded-xl font-bold tracking-wide flex justify-center items-center gap-2 transition-colors duration-200 ${
-                            product.isAvailable 
-                              ? 'bg-black text-white hover:bg-[#e0a82e] hover:text-black shadow-lg shadow-black/10' 
+                            product.isAvailable
+                              ? 'bg-black text-white hover:bg-[#e0a82e] hover:text-black shadow-lg shadow-black/10'
                               : 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
                           }`}
                         >
@@ -756,20 +815,20 @@ export default function App() {
             {checkoutStep === 'form' && (
               <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {renderCheckoutProgressBar('form')}
-                
-                <button 
+
+                <button
                   onClick={() => replaceOverlayWithPage('shop', 'shop')}
                   className="text-neutral-500 hover:text-black mb-6 flex items-center gap-2 text-sm font-medium transition-colors"
                 >
                   &larr; Wróć do sklepu
                 </button>
-                
+
                 <form onSubmit={proceedToBlik} className="relative">
                   <div className="grid lg:grid-cols-3 gap-8 items-start">
-                    
+
                     <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-neutral-100 p-6 sm:p-10">
                       <h2 className="text-2xl font-bold mb-8">Dane do zamówienia</h2>
-                      
+
                       <div className="mb-8">
                         <label className="block text-sm font-medium text-neutral-700 mb-3">Sposób dostawy</label>
                         <div className="grid sm:grid-cols-3 gap-3">
@@ -837,17 +896,23 @@ export default function App() {
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="lg:col-span-1 lg:sticky lg:top-28 space-y-6">
                       <div className="bg-neutral-50 p-6 rounded-3xl border border-neutral-200 shadow-sm">
                         <h3 className="font-bold text-lg mb-6 pb-4 border-b border-neutral-200">Podsumowanie</h3>
                         <div className="space-y-4 text-sm mb-6">
                           <div className="flex justify-between text-neutral-600"><span>Wartość koszyka:</span><span className="font-medium">{cartTotal.toFixed(2)} zł</span></div>
+                          {appliedPromoCode && (
+                               <div className="flex justify-between text-red-600">
+                                   <span>Rabat ({appliedPromoCode}):</span>
+                                   <span className="font-medium">-{discountAmount.toFixed(2)} zł</span>
+                               </div>
+                           )}
                           <div className="flex justify-between text-neutral-600">
                             <span>{deliveryMethod === 'paczkomat' && 'Paczkomat:'}{deliveryMethod === 'kurier' && 'Kurier:'}{deliveryMethod === 'pickup' && 'Odbiór osobisty:'}</span>
                             <span className="font-medium">{currentShippingCost > 0 ? `${currentShippingCost.toFixed(2)} zł` : 'Za darmo'}</span>
                           </div>
-                          <div className="flex justify-between text-xl font-bold text-black pt-4 border-t border-neutral-200"><span>Do zapłaty:</span><span>{(cartTotal + currentShippingCost).toFixed(2)} zł</span></div>
+                          <div className="flex justify-between text-xl font-bold text-black pt-4 border-t border-neutral-200"><span>Do zapłaty:</span><span>{finalToBePaid.toFixed(2)} zł</span></div>
                         </div>
 
                         <div className="mb-6 flex items-start gap-3 bg-[#e0a82e]/10 p-4 rounded-xl border border-[#e0a82e]/30">
@@ -872,19 +937,19 @@ export default function App() {
             {checkoutStep === 'blik' && (
               <div className="max-w-xl mx-auto animate-in fade-in duration-500 mt-4 sm:mt-12">
                  {renderCheckoutProgressBar('blik')}
-                 
+
                  <div className="bg-white rounded-3xl shadow-xl border border-neutral-100 overflow-hidden">
                     <div className="bg-black p-8 text-center text-white relative">
                       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#b8861b] via-[#f2c351] to-[#b8861b]"></div>
                       <div className="flex justify-center mb-4"><div className="bg-white text-black font-black text-2xl px-4 py-2 rounded flex items-center gap-2"><Smartphone size={24} /> BLIK na telefon</div></div>
                       <h2 className="text-lg font-medium text-neutral-400 mb-1">Kwota do zapłaty</h2>
-                      <p className="text-4xl text-[#e0a82e] font-bold">{(cartTotal + currentShippingCost).toFixed(2)} zł</p>
+                      <p className="text-4xl text-[#e0a82e] font-bold">{finalToBePaid.toFixed(2)} zł</p>
                     </div>
                     <div className="p-6 sm:p-10">
                       <div className="bg-[#e0a82e]/10 border border-[#e0a82e]/30 rounded-2xl p-6 mb-8 text-neutral-800 text-center">
                         <h3 className="font-bold text-lg mb-6 flex justify-center items-center gap-2"><Info className="text-[#e0a82e]" /> Zrób przelew na ten numer:</h3>
-                        
-                        <button 
+
+                        <button
                            type="button"
                            onClick={handleCopyPhone}
                            className="group flex flex-col sm:flex-row items-center justify-center gap-3 mx-auto mb-6 bg-white p-4 rounded-xl border border-[#e0a82e]/40 hover:border-[#e0a82e] hover:shadow-lg transition-all"
@@ -895,7 +960,7 @@ export default function App() {
                             <Copy size={14} /> Kopiuj numer
                           </span>
                         </button>
-                        
+
                         <p className="text-sm sm:text-base text-neutral-600 mb-2">W tytule przelewu wpisz: <strong className="text-black">{formData.name}</strong></p>
                         <p className="text-sm text-neutral-500">Po zleceniu przelewu w aplikacji banku, poinformuj nas o tym przyciskiem poniżej.</p>
                       </div>
@@ -967,7 +1032,7 @@ export default function App() {
                 <div className="h-full flex flex-col items-center justify-center text-neutral-400 space-y-6">
                   <ShoppingBag size={64} className="opacity-20" />
                   <p className="text-lg">Twój koszyk jest pusty.</p>
-                  <button 
+                  <button
                     onClick={handleCloseOverlay}
                     className="px-6 py-3 bg-black text-white font-bold rounded-xl hover:bg-[#e0a82e] hover:text-black transition-colors shadow-lg"
                   >
@@ -997,9 +1062,46 @@ export default function App() {
               )}
             </div>
             {cart.length > 0 && (
-              <div className="p-6 border-t border-neutral-100 bg-neutral-50">
+              <div className="p-6 border-t border-neutral-100 bg-neutral-50 relative">
+                {/* SEKJA KODÓW RABATOWYCH W KOSZYKU */}
+                <div className="mb-6">
+                    {!appliedPromoCode ? (
+                        <form onSubmit={handleApplyPromoCode} className="flex gap-2">
+                            <div className="relative flex-grow">
+                                <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
+                                <input
+                                    type="text"
+                                    value={promoCodeInput}
+                                    onChange={(e) => setPromoCodeInput(e.target.value)}
+                                    placeholder="Kod rabatowy"
+                                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-[#e0a82e] focus:border-[#e0a82e] outline-none transition-all text-sm uppercase"
+                                />
+                            </div>
+                            <button type="submit" className="px-4 py-3 bg-neutral-800 text-white font-bold rounded-xl hover:bg-[#e0a82e] hover:text-black transition-colors text-sm shrink-0">
+                                Użyj
+                            </button>
+                        </form>
+                    ) : (
+                        <div className="flex items-center justify-between bg-green-50 border border-green-200 p-3 rounded-xl text-green-700">
+                             <div className="flex items-center gap-2 font-bold text-sm">
+                                <Tag size={18} /> Kod: {appliedPromoCode} (-{(discountPercentage*100).toFixed(0)}%)
+                             </div>
+                             <button onClick={removePromoCode} className="text-neutral-400 hover:text-red-500 transition-colors p-1">
+                                 <XCircle size={20} />
+                             </button>
+                        </div>
+                    )}
+                    {promoError && <p className="text-red-500 text-xs mt-2 ml-2 font-medium">{promoError}</p>}
+                </div>
+
                 <div className="flex justify-between text-neutral-600 mb-2 text-sm"><span>Wartość koszyka:</span><span>{cartTotal.toFixed(2)} zł</span></div>
-                <div className="flex justify-between font-bold text-xl text-black mb-6"><span>Suma (bez dostawy):</span><span>{cartTotal.toFixed(2)} zł</span></div>
+                {appliedPromoCode && (
+                    <div className="flex justify-between text-red-600 mb-2 text-sm font-medium">
+                        <span>Rabat ({appliedPromoCode}):</span>
+                        <span>-{discountAmount.toFixed(2)} zł</span>
+                    </div>
+                )}
+                <div className="flex justify-between font-bold text-xl text-black mb-6"><span>Suma (bez dostawy):</span><span>{discountedCartTotal.toFixed(2)} zł</span></div>
                 <button onClick={() => replaceOverlayWithPage('shop', 'form')} className="w-full py-4 bg-black text-white rounded-xl font-bold hover:bg-[#e0a82e] hover:text-black transition-colors duration-200 shadow-xl shadow-black/10">Przejdź do kasy</button>
               </div>
             )}
@@ -1012,7 +1114,7 @@ export default function App() {
         <div className="fixed inset-0 z-[60] flex justify-start">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={handleCloseOverlay}></div>
           <div className="relative w-4/5 max-w-sm bg-black h-full flex flex-col shadow-2xl animate-in slide-in-from-left duration-300 text-white">
-            
+
             <div className="p-6 border-b border-[#1a1a1a] flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <div className="w-16 h-16 bg-black rounded-full overflow-hidden flex items-center justify-center shrink-0">
@@ -1024,26 +1126,26 @@ export default function App() {
             </div>
 
             <nav className="flex flex-col p-4 space-y-2 mt-4 flex-grow">
-              <button 
+              <button
                 onClick={() => replaceOverlayWithPage('shop', 'shop')}
                 className={`p-4 text-left rounded-xl text-lg font-medium transition-colors flex items-center gap-3 ${activePage === 'shop' ? 'bg-[#e0a82e] text-black' : 'text-zinc-300 hover:bg-[#1a1a1a] hover:text-white'}`}
               >
                 <ShoppingBag size={20} /> Sklep i Oferta
               </button>
-              <button 
+              <button
                 onClick={() => replaceOverlayWithPage('about', 'shop')}
                 className={`p-4 text-left rounded-xl text-lg font-medium transition-colors flex items-center gap-3 ${activePage === 'about' ? 'bg-[#e0a82e] text-black' : 'text-zinc-300 hover:bg-[#1a1a1a] hover:text-white'}`}
               >
                 <Info size={20} /> O Naszej Pasiece
               </button>
-              <button 
+              <button
                 onClick={() => replaceOverlayWithPage('gallery', 'shop')}
                 className={`p-4 text-left rounded-xl text-lg font-medium transition-colors flex items-center gap-3 ${activePage === 'gallery' ? 'bg-[#e0a82e] text-black' : 'text-zinc-300 hover:bg-[#1a1a1a] hover:text-white'}`}
               >
                 <Camera size={20} /> Galeria
               </button>
-              <button 
-                onClick={() => { 
+              <button
+                onClick={() => {
                   handleCloseOverlay();
                   setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 100);
                 }}
@@ -1051,7 +1153,7 @@ export default function App() {
               >
                 <Smartphone size={20} /> Kontakt
               </button>
-              <button 
+              <button
                 onClick={() => replaceOverlayWithOverlay('legal')}
                 className="p-4 text-left rounded-xl text-lg font-medium text-zinc-300 hover:bg-[#1a1a1a] hover:text-white transition-colors flex items-center gap-3"
               >
@@ -1066,7 +1168,7 @@ export default function App() {
           </div>
         </div>
       )}
-      
+
       {/* MODAL REGULAMINU I RODO */}
       {isLegalModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6">
@@ -1077,10 +1179,10 @@ export default function App() {
               <button onClick={handleCloseOverlay} className="p-2 hover:bg-neutral-100 rounded-full transition-colors"><X size={20} /></button>
             </div>
             <div className="p-6 overflow-y-auto text-sm text-neutral-600 space-y-6">
-              
+
               <div>
                 <h4 className="font-bold text-zinc-900 mb-2 font-serif text-lg">CZĘŚĆ I: REGULAMIN SKLEPU</h4>
-                
+
                 <p className="font-bold mt-4 mb-2 text-zinc-800">§ 1. Postanowienia ogólne</p>
                 <ol className="list-decimal pl-4 space-y-1 mb-4">
                   <li>Sprzedawcą miodu oraz Administratorem Danych Osobowych na stronie {SITE_URL} jest osoba fizyczna: {SELLER_NAME}, prowadząca działalność rolniczą w postaci pasieki "Nasze Pszczoły", zlokalizowanej pod adresem: {SELLER_ADDRESS}.</li>
@@ -1113,11 +1215,11 @@ export default function App() {
 
               <div className="pt-4 border-t border-neutral-100">
                 <h4 className="font-bold text-zinc-900 mb-2 font-serif text-lg">CZĘŚĆ II: POLITYKA PRYWATNOŚCI (RODO)</h4>
-                
+
                 <p className="mb-2"><strong className="text-zinc-800">§ 1. Kto przetwarza Twoje dane?</strong><br/>Administratorem Twoich danych osobowych przekazanych w formularzu zamówienia jest {SELLER_NAME}, {SELLER_ADDRESS}.</p>
-                
+
                 <p className="mb-2"><strong className="text-zinc-800">§ 2. Po co zbieramy Twoje dane i na jakiej podstawie?</strong><br/>Zbieramy Twoje dane (imię, nazwisko, adres wysyłki, numer telefonu, adres e-mail) wyłącznie w jednym celu: aby zrealizować Twoje zamówienie i wysłać Ci miód. Podstawą prawną przetwarzania jest art. 6 ust. 1 lit. b RODO (niezbędność do wykonania umowy, której stroną jest osoba, której dane dotyczą).</p>
-                
+
                 <p className="mb-2"><strong className="text-zinc-800">§ 3. Komu przekazujemy Twoje dane?</strong><br/>Nie sprzedajemy Twoich danych i nie używamy ich do wysyłania reklam. Twoje dane przekazujemy wyłącznie podmiotom, które pomagają nam dostarczyć Ci zamówienie, tj.:</p>
                 <ul className="list-disc pl-5 space-y-1 mb-4 marker:text-amber-500">
                   <li>Firmom kurierskim (np. InPost, DPD) w celu wygenerowania etykiety nadawczej.</li>
@@ -1125,7 +1227,7 @@ export default function App() {
                 </ul>
 
                 <p className="mb-2"><strong className="text-zinc-800">§ 4. Jak długo przechowujemy dane?</strong><br/>Twoje dane przechowujemy tylko tak długo, jak to konieczne do zrealizowania zamówienia, rozpatrzenia ewentualnych reklamacji oraz spełnienia obowiązków podatkowych i księgowych nałożonych przez polskie prawo.</p>
-                
+
                 <p className="mb-2"><strong className="text-zinc-800">§ 5. Twoje prawa</strong><br/>Masz prawo do:</p>
                 <ul className="list-disc pl-5 space-y-1 mb-4 marker:text-amber-500">
                   <li>dostępu do swoich danych,</li>
@@ -1148,26 +1250,26 @@ export default function App() {
 
       {/* MODAL GALERII (LIGHTBOX) Z NAWIGACJĄ I SWIPEM */}
       {selectedGalleryIndex !== null && (
-        <div 
+        <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4 touch-none"
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
         >
-          <div 
-            className="absolute inset-0 bg-black/95 backdrop-blur-md transition-opacity cursor-zoom-out" 
+          <div
+            className="absolute inset-0 bg-black/95 backdrop-blur-md transition-opacity cursor-zoom-out"
             onClick={handleCloseOverlay}
           ></div>
-          
-          <button 
-            onClick={handleCloseOverlay} 
+
+          <button
+            onClick={handleCloseOverlay}
             className="absolute top-4 right-4 sm:top-8 sm:right-8 p-2 text-zinc-400 hover:text-white bg-black/50 hover:bg-black rounded-full transition-all z-10"
           >
             <X size={32} />
           </button>
 
           {/* Przycisk Wstecz */}
-          <button 
+          <button
             onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
             className="absolute left-4 sm:left-8 p-2 text-zinc-400 hover:text-[#e0a82e] bg-black/50 hover:bg-black rounded-full transition-all z-10 hidden sm:block"
           >
@@ -1175,29 +1277,29 @@ export default function App() {
           </button>
 
           {/* Przycisk Dalej */}
-          <button 
+          <button
             onClick={(e) => { e.stopPropagation(); handleNextImage(); }}
             className="absolute right-4 sm:right-8 p-2 text-zinc-400 hover:text-[#e0a82e] bg-black/50 hover:bg-black rounded-full transition-all z-10 hidden sm:block"
           >
             <ChevronRight size={48} strokeWidth={1.5} />
           </button>
-          
+
           <div className="relative w-full h-full max-h-[90vh] flex items-center justify-center animate-in zoom-in-95 duration-300 pointer-events-none select-none">
-            <img 
+            <img
               key={selectedGalleryIndex}
               src={`/galeria${selectedGalleryIndex < 10 ? `0${selectedGalleryIndex}` : selectedGalleryIndex}.jpg`}
-              alt={`Powiększenie z galerii ${selectedGalleryIndex}`} 
+              alt={`Powiększenie z galerii ${selectedGalleryIndex}`}
               className="max-w-full max-h-full object-contain rounded-xl shadow-2xl pointer-events-auto select-none origin-center"
               draggable="false"
-              style={{ 
-                transform: `translateX(${swipeOffset}px) scale(${scale})`, 
+              style={{
+                transform: `translateX(${swipeOffset}px) scale(${scale})`,
                 transition: (isSwiping || pinchDist) ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease-out',
                 opacity: isSwiping ? Math.max(0.4, 1 - Math.abs(swipeOffset) / (window.innerWidth || 400)) : 1
               }}
-              onError={(e) => { 
-                e.target.style.display = 'none'; 
-                e.target.nextSibling.style.display = 'flex'; 
-              }} 
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'flex';
+              }}
             />
             <div className="hidden absolute inset-0 flex-col items-center justify-center text-zinc-500">
               <Camera size={48} className="mb-4 opacity-50" />
