@@ -63,10 +63,10 @@ const PRODUCTS = [
   }
 ];
 
-// --- KODY RABATOWE (Hardcoded na ten moment) ---
+// --- KODY RABATOWE (Zniżka kwotowa na słoiku) ---
 const PROMO_CODES = {
-    'WIOSNA10': 0.10, // 10% zniżki
-    // Można dodać więcej: 'STAŁYKLIENT': 0.15,
+    'WIOSNA26': 5.00, // 5 zł zniżki na KAŻDYM słoiku
+    // Można dodać więcej: 'STAŁYKLIENT': 10.00,
 };
 
 
@@ -297,10 +297,11 @@ export default function App() {
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const currentShippingCost = SHIPPING_COSTS[deliveryMethod];
 
-  // Kalkulacja rabatu
-  const discountPercentage = appliedPromoCode ? PROMO_CODES[appliedPromoCode] : 0;
-  const discountAmount = cartTotal * discountPercentage;
-  const discountedCartTotal = cartTotal - discountAmount;
+  // Kalkulacja rabatu kwotowego na sztukę (np. 5 zł na każdym słoiku)
+  const discountPerItem = appliedPromoCode ? PROMO_CODES[appliedPromoCode] : 0;
+  const discountAmount = cartItemCount * discountPerItem;
+  // Zabezpieczenie, żeby rabat nie przewyższył wartości koszyka
+  const discountedCartTotal = Math.max(0, cartTotal - discountAmount);
 
   // Ostateczna kwota do zapłaty
   const finalToBePaid = discountedCartTotal + currentShippingCost;
@@ -346,7 +347,7 @@ export default function App() {
     });
 
     if (appliedPromoCode) {
-        emailBody += `\nZASTOSOWANY KOD RABATOWY: ${appliedPromoCode} (-${discountAmount.toFixed(2)} zł)\n`;
+        emailBody += `\nZASTOSOWANY KOD RABATOWY: ${appliedPromoCode} (-${discountAmount.toFixed(2)} zł, tj. -${discountPerItem.toFixed(2)} zł/szt.)\n`;
         emailBody += `WARTOŚĆ KOSZYKA PO RABACIE: ${discountedCartTotal.toFixed(2)} zł\n`;
     }
 
@@ -1084,7 +1085,7 @@ export default function App() {
                     ) : (
                         <div className="flex items-center justify-between bg-green-50 border border-green-200 p-3 rounded-xl text-green-700">
                              <div className="flex items-center gap-2 font-bold text-sm">
-                                <Tag size={18} /> Aktywny rabat (-{(discountPercentage*100).toFixed(0)}%)
+                                <Tag size={18} /> Aktywny rabat (-{discountPerItem} zł/szt.)
                              </div>
                              <button onClick={removePromoCode} className="text-neutral-400 hover:text-red-500 transition-colors p-1">
                                  <XCircle size={20} />
