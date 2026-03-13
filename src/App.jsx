@@ -278,7 +278,7 @@ export default function App() {
 
       if (PROMO_CODES.hasOwnProperty(normalizedCode)) {
           setAppliedPromoCode(normalizedCode);
-          showToast(`Kod ${normalizedCode} aktywowany!`, 'success');
+          showToast('Kod rabatowy aktywowany!', 'success');
       } else {
           setPromoError('Kod jest nieprawidłowy lub wygasł.');
           setAppliedPromoCode(null);
@@ -561,7 +561,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* NAVBAR - FIX: Dodano border-b dla oddzielenia od tła */}
+      {/* NAVBAR */}
       <nav className="sticky top-0 z-40 bg-black text-[#e0a82e] shadow-md border-b border-neutral-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex items-center justify-between">
 
@@ -904,7 +904,7 @@ export default function App() {
                           <div className="flex justify-between text-neutral-600"><span>Wartość koszyka:</span><span className="font-medium">{cartTotal.toFixed(2)} zł</span></div>
                           {appliedPromoCode && (
                                <div className="flex justify-between text-red-600">
-                                   <span>Rabat ({appliedPromoCode}):</span>
+                                   <span>Naliczony rabat:</span>
                                    <span className="font-medium">-{discountAmount.toFixed(2)} zł</span>
                                </div>
                            )}
@@ -1084,7 +1084,7 @@ export default function App() {
                     ) : (
                         <div className="flex items-center justify-between bg-green-50 border border-green-200 p-3 rounded-xl text-green-700">
                              <div className="flex items-center gap-2 font-bold text-sm">
-                                <Tag size={18} /> Kod: {appliedPromoCode} (-{(discountPercentage*100).toFixed(0)}%)
+                                <Tag size={18} /> Aktywny rabat (-{(discountPercentage*100).toFixed(0)}%)
                              </div>
                              <button onClick={removePromoCode} className="text-neutral-400 hover:text-red-500 transition-colors p-1">
                                  <XCircle size={20} />
@@ -1097,7 +1097,7 @@ export default function App() {
                 <div className="flex justify-between text-neutral-600 mb-2 text-sm"><span>Wartość koszyka:</span><span>{cartTotal.toFixed(2)} zł</span></div>
                 {appliedPromoCode && (
                     <div className="flex justify-between text-red-600 mb-2 text-sm font-medium">
-                        <span>Rabat ({appliedPromoCode}):</span>
+                        <span>Naliczony rabat:</span>
                         <span>-{discountAmount.toFixed(2)} zł</span>
                     </div>
                 )}
