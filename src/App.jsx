@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ShoppingBag, ChevronRight, ChevronLeft, CheckCircle, ShieldCheck, Truck, Info, X, MapPin, Smartphone, Box, Menu, Camera, AlertCircle, Copy, FileText, Tag } from 'lucide-react';
+import { ShoppingBag, ChevronRight, ChevronLeft, CheckCircle, ShieldCheck, Truck, Info, X, MapPin, Smartphone, Box, Menu, Camera, AlertCircle, Copy, FileText, Tag, XCircle } from 'lucide-react';
 
 // --- WŁASNY KOMPONENT IKONY (Plaster Miodu) ---
 const HoneycombIcon = ({ size = 24, className = "" }) => (
